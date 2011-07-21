@@ -13,7 +13,7 @@ invoking the diff-<lang> functions. For example:
 
 
 (load "diff-scheme.ss")
-(diff-<lang> file1 file2)
+(diff-<lang> "file1.ss" "file2.ss")
 
 
 
