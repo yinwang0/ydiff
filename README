@@ -1,6 +1,3 @@
-yDiff
-
-
 * How to build and use
 
 yDiff is implemented in Scheme. The Scheme implementation I'm using is Racket.
@@ -11,10 +8,8 @@ different languages, and there is no Unix command line interface. In order to
 use it, you need to load the 'diff-<lang>.ss' files in the Racket repl before
 invoking the diff-<lang> functions. For example:
 
-
 (load "diff-scheme.ss")
 (diff-<lang> "file1.ss" "file2.ss")
-
 
 
 * Contact
@@ -24,4 +19,4 @@ If you have suggestions, please contact Yin Wang (yinwang0@gmail.com).
 
 * LICENSE
 
-yDiff is licensed with GPL v3
+yDiff is licensed under GPL v3
