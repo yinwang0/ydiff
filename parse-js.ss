@@ -42,11 +42,18 @@
   (list #\newline #\linefeed #\u2028 #\u2029))
 
 
+(define alpha?
+  (predor char-alphabetic?
+          (lambda (x) (char=? x #\$))))
+
+
 
 
 ;-------------------------------------------------------------
 ;                     primitive parsers
 ;-------------------------------------------------------------
+
+
 
 (:: $identifier
   ($pred
