@@ -1,0 +1,77 @@
+yDiff
+
+
+yDiff is a language-based tool for comparing programs. It supports multiple
+programming languages. It is in development and not ready for release yet. You
+are welcome to follow my development and play with it, but remember that it will
+not be very user-friendly at this time.
+
+
+
+* How to build and use
+
+yDiff is implemented in Scheme. The Scheme implementation I'm using is Racket.
+You can find it from http://racket-lang.org.
+
+It supports multiple languages but currently it is not cleanly modularized for
+different languages, and there is no Unix command line interface. In order to
+use it, you need to load the 'diff-<lang>.ss' files in the Racket repl before
+invoking the diff-<lang> functions. For example:
+
+
+(load "diff-scheme.ss")
+(diff-<lang> file1 file2)
+
+
+
+* Why yDiff?
+
+We often want to know the how code is modified. This is normally done by using
+the diff program. While useful for finding difference between close revisions,
+the result from diff can be very hard to read for revisions over a long time
+span. The worst case is when the code is massively rearranged or refactored,
+diff usually produces completely unreadable report.
+
+yDiff can help in this kind of situation. Different from line-based or
+character-based diff, yDiff is language-based. It parses the programs and then
+performs structural comparison of the parse trees. In addition to the usual
+functionalities of diff, it has the following features:
+
+- Refactor detection. It can detect renamed, moved, reordered, wrapped, lifted,
+  combined or fragmented code.
+
+- Code similarity assessment. It has an accurate and meaningful measure of code
+  similarity.
+
+- Format insensitivity. The comparison result will not be affected by
+  linebreaks, whitespaces or comments.
+
+- These properties make yDiff helpful for understanding changes. It may also be
+  used for detecting plagiarism in programming classes or copyright infringement
+  of code.
+
+
+* Supported Languages
+
+Currently yDiff supports several languages:
+
+- Scheme
+- Emacs Lisp
+- Python
+- Javascript
+- C++
+
+I will be adding more languages.
+
+
+
+* Demos
+
+See my home page for the ready-to-view demos:
+http://www.cs.indiana.edu/~yw21/ydiff.html
+
+
+* Contact
+
+If you have suggestions, please contact Yin Wang (yinwang0@gmail.com).
+
