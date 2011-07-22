@@ -17,6 +17,10 @@
 
 
 
+// convenience function for document.getElementById().
+window['$']=function(a){return document.getElementById(a)};
+
+
 /////////////////////// debug flag ////////////////////////
 var debug = false;
 
@@ -66,7 +70,7 @@ function log(msg) {
 
 
 function elementPosition(id) {
-    obj = document.getElementById(id);
+    obj = $(id);
     var curleft = 0, curtop = 0;
 
     if (obj && obj.offsetParent) {
@@ -99,13 +103,13 @@ function scrollWithBlockCheck(container, distX, distY) {
     log("distX=" + distX + ", actualX=" + actualX);
 
     // extra leewaw here because Chrome scrolling is horribly inacurate
-    if ((Math.abs(distX) > blockRange && actualX == 0)
-        || Math.abs(distY) > blockRange && actualY == 0) {
+    if ((Math.abs(distX) > blockRange && actualX === 0)
+        || Math.abs(distY) > blockRange && actualY === 0) {
         log("blocked");
         container.style.backgroundColor = bodyBlockedColor;
         return true;
     } else {
-        eventCount[container.id]++;
+        eventCount[container.id] += 1;
         container.style.backgroundColor = bgColor;
         return false;
     }
@@ -113,7 +117,7 @@ function scrollWithBlockCheck(container, distX, distY) {
 
 
 function getContainer(elm) {
-    while (elm && elm.tagName != 'DIV') {
+    while (elm && elm.tagName !== 'DIV') {
         elm = elm.parentElement || elm.parentNode;
     }
     return elm;
@@ -127,8 +131,8 @@ function matchWindow(linkId, targetId, n)
 {
     moving = true;
 
-    var link = document.getElementById(linkId);
-    var target = document.getElementById(targetId);
+    var link = $(linkId);
+    var target = $(targetId);
     var linkContainer = getContainer(link);
     var targetContainer = getContainer(target);
 
@@ -140,7 +144,7 @@ function matchWindow(linkId, targetId, n)
 
     log("matching window... " + n + " distY=" + distY + " distX=" + distX);
 
-    if (distY == 0 && distX == 0) {
+    if (distY === 0 && distX === 0) {
         clearTimeout(cTimeout);
         moving = false;
     } else if (n <= 1) {
@@ -158,8 +162,9 @@ function matchWindow(linkId, targetId, n)
         var rest = Math.floor(distY / step) - 1;
         log("blocked?" + blocked + ", rest steps=" + rest);
         if (!blocked) {
-            cTimeout = setTimeout("matchWindow(" + linkId + "," + targetId + ","
-                                  + rest + ")", stepInterval);
+            cTimeout = setTimeout(function () {
+                return matchWindow(linkId, targetId, rest);
+            }, stepInterval);
         } else {
             clearTimeout(cTimeout);
             moving = false;
@@ -173,10 +178,10 @@ function matchWindow(linkId, targetId, n)
 
 var highlighted = []
 function putHighlight(id, color) {
-    var elm = document.getElementById(id);
-    if (elm != null) {
+    var elm = $(id);
+    if (elm !== null) {
         elm.style.backgroundColor = color;
-        if (color != bgColor) {
+        if (color !== bgColor) {
             highlighted.push(id);
         }
     }
@@ -184,7 +189,7 @@ function putHighlight(id, color) {
 
 
 function clearHighlight() {
-    for (i = 0; i < highlighted.length; i++) {
+    for (i = 0; i < highlighted.length; i += 1) {
         putHighlight(highlighted[i], bgColor);
     }
     highlighted = [];
@@ -198,7 +203,7 @@ function clearHighlight() {
  */
 function highlight(me, linkId, targetId, linkLineId, targetLineId)
 {
-    if (me.id == 'left') {
+    if (me.id === 'left') {
         matchId1 = linkId;
         matchId2 = targetId;
     } else {
@@ -223,8 +228,8 @@ function instantMoveOtherWindow (me) {
 
     me.style.backgroundColor = bgColor;
 
-    if (!moving && eventCount[me.id] == 0) {
-        if (me.id == 'left') {
+    if (!moving && eventCount[me.id] === 0) {
+        if (me.id === 'left') {
             matchWindow(matchId1, matchId2, 1);
         } else {
             matchWindow(matchId2, matchId1, 1);
@@ -246,7 +251,7 @@ window.onload =
     function (e) {
         var tags = document.getElementsByTagName("A")
         for (var i = 0; i < tags.length; i++) {
-            tags[i].onclick =
+            tags[i].onmouseover =
                 function (e) {
                     var t = getTarget(e)
                     var lid = t.id
@@ -265,3 +270,4 @@ window.onload =
         }
 
     }
+
