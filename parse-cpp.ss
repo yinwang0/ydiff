@@ -86,48 +86,7 @@
 (::  |{|   (@~ "{"))
 (::  |}|   (@~ "}"))
 
-
-
-;; redefine sequence to get over newlines
-;; the definition of |\n| must not contain any call to @seq
-
-(define $glob1
-  (lambda (p)
-    (lambda ()
-      (lambda (toks stk ctx)
-        (letv ([(t r) ((p) toks stk ctx)])
-          (cond
-           [(not t) (values #f #f)]
-           [else
-            (values '() r)]))))))
-
-(define @*1
-  (lambda (p)
-    (lambda ()
-      (lambda (toks stk ctx)
-        (let loop ([toks toks] [nodes '()])
-          (cond
-           [(null? toks)
-            (values (apply append (reverse nodes)) '())]
-           [else
-            (letv ([(t r) ((p) toks stk ctx)])
-              (cond
-               [(not t)
-                (values (apply append (reverse nodes)) toks)]
-               [else
-                (loop r (cons t nodes))]))]))))))
-
-(define @!1
-  (lambda (p)
-    (lambda ()
-      (lambda (toks stk ctx)
-        (letv ([(t r) ((p) toks stk ctx)])
-          (cond
-           [(not t) (values (list (car toks)) (cdr toks))]
-           [else (values #f #f)]))))))
-
-
-(::  |\n|  ($glob1 (@*1 $newline)))
+(::  |\n|  ($glob^ (@*^ $newline)))
 (::  |;\n| (@or |;| |\n|))
 
 
@@ -139,10 +98,13 @@
       (apply old-seq `(,|\n| ,@psj ,|\n|)))))
 
 
+
+;; a hacky definition for macros
+;; will fix later
 (::= $macro-defintion 'macro
      (@~ "#")
-     (@*1 (old-seq (@*1 (@and (@!1 ($$ "\\")) (@!1 $newline))) ($$ "\\") (@*1 $newline)))
-     (old-seq (@*1 (@!1 $newline)) ($glob1 $newline) ($glob1 (@*1 $newline)))
+     (@*^ (old-seq (@*^ (@and (@!^ ($$ "\\")) (@!^ $newline))) ($$ "\\") (@*^ $newline)))
+     (old-seq (@*^ (@!^ $newline)) ($glob^ $newline) ($glob^ (@*^ $newline)))
 )
 
 
@@ -952,12 +914,12 @@
 ;                          tests
 ;-------------------------------------------------------------
 
-;; (test-file "simulator-arm.cc"
-;;            "simulator-mips.cc"
-;;            "d8-3404.cc"
-;;            "d8-8424.cc"
-;;            "assembler-arm-2.cc"
-;;            "assembler-arm-7.cc"
-;;            "assembler-arm-8309.cc"
+;; (test-file "tests/simulator-arm.cc"
+;;            "tests/simulator-mips.cc"
+;;            "tests/d8-3404.cc"
+;;            "tests/d8-8424.cc"
+;;            "tests/assembler-arm-2.cc"
+;;            "tests/assembler-arm-7.cc"
+;;            "tests/assembler-arm-8309.cc"
 ;; )
 

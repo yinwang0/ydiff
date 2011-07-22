@@ -24,7 +24,7 @@
 ;                         settings
 ;-------------------------------------------------------------
 
-(define *move-ratio* 0)
+(define *move-ratio* 0.1)
 (define *move-size* 3)
 (define *move-depth* 1000)
 (define *move-iteration* 1000)

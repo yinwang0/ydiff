@@ -460,6 +460,25 @@
 ; ($eval (@* ($$ "ok")) (scan "ok ok ok"))
 
 
+;; similar to @*, but takes only one parser and will not
+;; make a sequence by invoking @seq
+(define @*^
+  (lambda (p)
+    (lambda ()
+      (lambda (toks stk ctx)
+        (let loop ([toks toks] [nodes '()])
+          (cond
+           [(null? toks)
+            (values (apply append (reverse nodes)) '())]
+           [else
+            (letv ([(t r) ((p) toks stk ctx)])
+              (cond
+               [(not t)
+                (values (apply append (reverse nodes)) toks)]
+               [else
+                (loop r (cons t nodes))]))]))))))
+
+
 (define @+
   (lambda (p)
     (@... p (@* p))))
@@ -475,7 +494,7 @@
 ; (((@? ($$ "x"))) (scan "x y z"))
 
 
-
+;; negation - will fail if ps parses successfully.
 (define @!
   (lambda ps
     (let ([parser ((apply @... ps))])
@@ -485,6 +504,20 @@
             (cond
              [(not t) (values (list (car toks)) (cdr toks))]
              [else (values #f #f)])))))))
+
+
+;; similar to @!, but takes only one parser and will not
+;; make a sequence by invoking @seq
+(define @!^
+  (lambda (p)
+    (lambda ()
+      (lambda (toks stk ctx)
+        (letv ([(t r) ((p) toks stk ctx)])
+          (cond
+           [(not t) (values (list (car toks)) (cdr toks))]
+           [else (values #f #f)]))))))
+
+
 
 
 (define @and
@@ -520,8 +553,21 @@
              [else
               (values '() r)])))))))
 
-
 ; (($glob ($$ "foo")) (scan "foo bar"))
+
+
+
+;; similar to $glob, but takes only one parser and will not
+;; make a sequence by invoking @seq
+(define $glob^
+  (lambda (p)
+    (lambda ()
+      (lambda (toks stk ctx)
+        (letv ([(t r) ((p) toks stk ctx)])
+          (cond
+           [(not t) (values #f #f)]
+           [else
+            (values '() r)]))))))
 
 
 
@@ -962,14 +1008,13 @@
 
 
 ;; (parse-sexp (read-file "paredit20.el"))
-
 ;; (parse-sexp "(lambda (x) x)")
 
 
 
 
-;;--------------------------------------------
-;; direct left recursion
+;;-------------- direct left recursion test ---------------
+;;
 ;; (::= $left 'left
 ;;   (@or (@seq $left ($$ "ok"))
 ;;        ($$ "ok")))
@@ -977,8 +1022,8 @@
 ;; ($eval $left (scan "ok"))
 
 
-;;--------------------------------------------
-;; indirect left-recursion
+;;---------- indirect left-recursion -------------
+;;
 ;; (::= $left1 'left1
 ;;   (@seq $left2 ($$ "ok")))
 

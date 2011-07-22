@@ -19,6 +19,8 @@
 (load "parsec.ss")
 
 
+
+
 ;-------------------------------------------------------------
 ;                     scanner settings
 ;-------------------------------------------------------------
@@ -28,9 +30,13 @@
 (define *operators*
   (list
    ">>>="
+
    "<<=" ">>=" ">>>" "===" "!=="
-   "==" "!="  ">=" "<=" "&&" "||" ">>" "<<" "+=" "-=" "*=" "/=" "++" "--"
-   "=" "+" "-" "*" "/" "%" ">" "<" "!" ":" "?" "."
+
+   "==" "!="  ">=" "<=" "&&" "||" ">>" "<<" "++" "--"
+   "+=" "-=" "*=" "/=" "%=" "&=" "^=" "|="
+
+   "=" "+" "-" "*" "/" "%" "~" "!" ":" "?" "." ">" "<"
 ))
 
 
@@ -52,8 +58,6 @@
 ;-------------------------------------------------------------
 ;                     primitive parsers
 ;-------------------------------------------------------------
-
-
 
 (:: $identifier
   ($pred
@@ -84,43 +88,17 @@
 (::  |{|   (@~ "{"))
 (::  |}|   (@~ "}"))
 (::  |//|  ($glob (@* $comment)))
-;; (::  |\n|  ($glob (@* $newline)))
-;; (::  |;\n| (@or |;| |\n|))
 (::  |//\n| (@or |//| |\n|))
 
 
-(define $glob1
-  (lambda (p)
-    (lambda ()
-      (lambda (toks stk ctx)
-        (letv ([(t r) ((p) toks stk ctx)])
-          (cond
-           [(not t) (values #f #f)]
-           [else
-            (values '() r)]))))))
-
-(define @*1
-  (lambda (p)
-    (lambda ()
-      (lambda (toks stk ctx)
-        (let loop ([toks toks] [nodes '()])
-          (cond
-           [(null? toks)
-            (values (apply append (reverse nodes)) '())]
-           [else
-            (letv ([(t r) ((p) toks stk ctx)])
-              (cond
-               [(not t)
-                (values (apply append (reverse nodes)) toks)]
-               [else
-                (loop r (cons t nodes))]))]))))))
-
-(::  |\n|  ($glob1 (@*1 $newline)))
+;; $glob^ and $*^ needed to define |\n|, because the
+;; definition of |\n| must not contain any call to @seq
+;; otherwise the parser will go into infinite loop
+(::  |\n|  ($glob^ (@*^ $newline)))
 (::  |;\n| (@or |;| |\n|))
 
 
-;; redefine sequence to get over newlines
-;; the definition of |\n| must not contain any call to @seq
+;; Redefine sequence to get over newlines
 (define old-seq @seq)
 (define @seq
   (lambda ps
@@ -383,92 +361,10 @@
   (lambda (s)
     (@= 'op ($$ s))))
 
-(define @precedence
-  (lambda ps
-    (define build
-      (lambda (head tail)
-        (cond
-         [(null? tail) head]
-         [else
-          (build (@or head (car tail)) (cdr tail))])))
-    (cond
-     [(null? ps)
-      (fatal '@precedence
-             "need at least one expression to build precedence")]
-     [else
-      (build (car ps) (cdr ps))])))
-
-
-(define-syntax ::op
-  (syntax-rules ()
-    [(_ (name1 op1 fix1 asso1))
-     (begin
-       (define name1
-         (cond
-          [(eq? fix1 'infix)
-           (cond
-            [(eq? asso1 'left)
-             (@infix-left 'binop name2 op1)]
-            [else
-             (@infix-right 'binop name2 op1)])]
-          [(eq? fix1 'postfix)
-           (@postfix 'postfix $name2 $op1)]
-          [(eq? fix1 'prefix)
-           (@prefix 'prefix $name2 $op1)])))]
-    [(_ (name1 op1 fix1 asso1)
-        (name2 op2 fix2 asso2)
-        (name3 op3 fix3 asso3) ...)
-     (begin
-       (define name1
-         (cond
-          [(eq? fix1 'infix)
-           (cond
-            [(eq? asso1 'left)
-             (@or (@infix-left 'binop name2 op1)
-                  name2)]
-            [else
-             (@or (@infix-right 'binop name2 op1)
-                  name2)])]
-          [(eq? fix1 'postfix)
-           (@or (@postfix 'postfix $name2 $op1)
-                name2)]
-          [(eq? fix1 'prefix)
-           (@or (@prefix 'prefix $name2 $op1)
-                name2)
-           ]))
-       (::op (name2 op2 fix2 asso2)
-             (name3 op3 fix3 asso3) ...))]))
-
-
-
-
-;; 18. comma
-;;--------------------------------------------
-;; (:: $expression
-;;     (::op ($comma-expression "," 'left)
-;;           ($assignment-expression $assignment-operator 'right)
-;;           ($conditional-expression )
-;;           $logical-or-expression
-;;           $logical-and-expression
-;;           $bitwise-or-expression
-;;           $bitwise-xor-expression
-;;           $bitwise-and-expression
-;;           $equality-expression
-;;           $relational-expression
-;;           $bitwise-shift-expression
-;;           $additive-expression
-;;           $multiplicative-expression
-;;           $prefix-expression
-;;           $postfix-expression
-;;           $primary-expression
-;;           ))
-
-
 
 
 (:: $expression
-    $comma-expression
-    )
+    $comma-expression)
 
 
 
@@ -489,18 +385,6 @@
 
          $conditional-expression
          ))
-
-
-;; (:: $assignment-expression
-;;     (@or (@infix-right 'assignment
-;;                        $conditional-expression
-;;                        $assignment-operator)
-
-;;          $conditional-expression
-;;          ))
-
-
-; ($eval $assignment-expression (scan "x *= 1"))
 
 
 (:: $assignment-operator
