@@ -3,8 +3,11 @@
 yDiff is implemented in Scheme. The Scheme implementation I'm using is Racket.
 You can find it from http://racket-lang.org.
 
-yDiff supports multiple languages but currently it is not cleanly modularized
-for different languages, and there is no Unix command line interface. In order
+yDiff supports multiple languages but currently it is not
+cleanly modularized for different languages. There are
+global parameters, which I should remove later.
+
+There is no Unix command line interface. In order
 to use it, you need to load the 'diff-<lang>.ss' files in the Racket repl before
 invoking the diff-<lang> functions. For example:
 
