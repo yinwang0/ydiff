@@ -21,11 +21,7 @@
 
 
 (define *move-ratio* 0)
-(define *move-size* 3)
-(define *move-depth* 1000)
-(define *move-iteration* 1000)
-(define *min-frame-depth* 10000)
-(define *min-frame-size* 3)
+(define *move-size* 10)
 (define *max-string-len* 200)
 
 
@@ -47,5 +43,5 @@
 
 
 
-; (diff-scheme "diff-js.ss" "diff-cpp.ss")
+; (diff-scheme "tests/paredit20.el" "tests/paredit22.el")
 

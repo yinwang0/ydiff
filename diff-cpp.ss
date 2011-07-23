@@ -27,10 +27,6 @@
 
 (define *move-ratio* 0)
 (define *move-size* 7)
-(define *move-depth* 1000)
-(define *move-iteration* 1000)
-(define *min-frame-size* 5)
-(define *min-frame-depth* 10000)
 (define *max-string-len* 200)
 
 

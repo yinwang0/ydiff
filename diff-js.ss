@@ -24,12 +24,8 @@
 ;                         settings
 ;-------------------------------------------------------------
 
-(define *move-ratio* 0.1)
-(define *move-size* 3)
-(define *move-depth* 1000)
-(define *move-iteration* 1000)
-(define *min-frame-size* 3)
-(define *min-frame-depth* 10000)
+(define *move-ratio* 0)
+(define *move-size* 5)
 (define *max-string-len* 200)
 
 

@@ -35,52 +35,15 @@
 
 ;; The minimum size of a node to be considered for moves.
 ;; Shouldn't be too small, otherwise small deletec names
-;; will appear in a very distant place! This number should
-;; be larger than *min-frame-size* otherwise it will not be
-;; effective because substructural diff will do it.
+;; will appear in a very distant place!
 (define *move-size* 5)
-
-
-;; The depth limit for detecting substructural moves. If
-;; this is set, we will ignore nodes that are deeper than
-;; this number. The minimum is 7 to be useful.
-(define *move-depth* 5)
-
-;; How many iterations do we go for moves? This parameter
-;; should be large enough so that we can discover enough
-;; moves. The algorithm is guaranteed to terminate, but it
-;; should be be set to some small number if we found that it
-;; takes too much time to terminate. This value should be
-;; larger than 7 in order to work for normal programs.
-(define *move-iteration* 1000)
-
-
-;; How large must a node be considered as container for
-;; another node? If this is set to a big number, we will
-;; ignore nodes that are smaller than the number. This
-;; number shouldn't be too small, otherwise too many
-;; spurious moves will be detected! For example, a deleted
-;; "int" could be moved to a very far place! Setting it to a
-;; bigger number also reduces running time (by a great
-;; amount) because less substructural moves are considered.
-;; Set it to a larger number will cause loss of
-;; substructural changes, but greatly reduces time to run.
-(define *min-frame-size* 3)
-
-
-;; How deep must the frames be for us to consider them as
-;; moves? This affects only already extracted frames, which
-;; may be considered to be moves to other extracted frames.
-;; Set it large will not necessarily lower accuracy, but
-;; improves performance.
-(define *min-frame-depth* 2)
 
 
 ;; How long must a string be in order for us to use
 ;; string-dist function, which is costly when used on long
 ;; strings but the most accurate method to use. This
-;; parameter affects strings/comments only. We use
-;; string-dist for all Tokens.
+;; parameter affects strings/comments only. We use accurate
+;; string comparison for all Tokens.
 (define *max-string-len* 200)
 
 
@@ -665,9 +628,8 @@
 (define diff-sub
   (lambda (node1 node2 depth move?)
     (cond
-     [(or (>= depth *move-depth*)
-          (< (node-size node1) *min-frame-size*)
-          (< (node-size node2) *min-frame-size*))
+     [(or (< (node-size node1) *move-size*)
+          (< (node-size node2) *move-size*))
       (values #f #f)]
      [(and (Expr? node1) (Expr? node2))
       (cond
@@ -715,13 +677,6 @@
     (>= (node-size node) *move-size*)))
 
 
-
-(define shallow-frame?
-  (lambda (node)
-    (and (eq? 'frame (node-type node))
-         (< (node-depth node) *min-frame-depth*))))
-
-
 (define big-change?
   (lambda (c)
     (cond
@@ -734,27 +689,6 @@
           (big-node? (Change-cur c)))])))
 
 
-(define shallow-change?
-  (lambda (c)
-    (cond
-     [(ins? c)
-      (shallow-frame? (Change-cur c))]
-     [(del? c)
-      (shallow-frame? (Change-orig c))]
-     [(mod? c)
-      (or (shallow-frame? (Change-orig c))
-          (shallow-frame? (Change-cur c)))])))
-
-
-(define large-change?
-  (predand big-change? (negate shallow-frame?)))
-
-
-
-; ((predand number? (lambda (x) (> x 1))) 0)
-; ((predor number? (lambda (x) (> x 1))) 5)
-
-
 (define node-sort-fn
   (lambda (x y)
     (< (get-start x) (get-start y))))
@@ -765,46 +699,41 @@
   (lambda (changes)
     (set! *diff-hash* (make-hasheq))
     (let loop ([changes changes] [moved '()] [count 1])
-      (cond
-       [(> count *move-iteration*)
-        (let ([all-changes (append changes moved)])
-          (apply append (map disassemble-change all-changes)))]
-       [else
-        (printf "~n[closure loop #~a] " count)
-        (let* ([del-changes (filter (predand del?
-                                             (predor (lambda (c)
-                                                       (language-specific-include?
-                                                        (Change-orig c)))
-                                                     large-change?))
-                                    changes)]
-               [add-changes (filter (predand ins?
-                                             (predor (lambda (c)
-                                                       (language-specific-include?
-                                                        (Change-cur c)))
-                                                     large-change?))
-                                    changes)]
-               [old-moves (filter mod? changes)]
-               [unincluded (set- changes (append old-moves
-                                                 del-changes
-                                                 add-changes))]
-               [dels (map Change-orig del-changes)]
-               [adds (map Change-cur add-changes)]
-               [sorted-dels (sort dels node-sort-fn)]
-               [sorted-adds (sort adds node-sort-fn)])
+      (printf "~n[closure loop #~a] " count)
+      (let* ([del-changes (filter (predand del?
+                                           (predor (lambda (c)
+                                                     (language-specific-include?
+                                                      (Change-orig c)))
+                                                   big-change?))
+                                  changes)]
+             [add-changes (filter (predand ins?
+                                           (predor (lambda (c)
+                                                     (language-specific-include?
+                                                      (Change-cur c)))
+                                                   big-change?))
+                                  changes)]
+             [old-moves (filter mod? changes)]
+             [unincluded (set- changes (append old-moves
+                                               del-changes
+                                               add-changes))]
+             [dels (map Change-orig del-changes)]
+             [adds (map Change-cur add-changes)]
+             [sorted-dels (sort dels node-sort-fn)]
+             [sorted-adds (sort adds node-sort-fn)])
 
-          (letv ([t (make-hasheq)]
-                 [(m c) (diff-list t sorted-dels sorted-adds 0 #t)]
-                 [new-moves (map mod->mov (filter mod? m))])
-            (printf "~n~a new moves found" (length new-moves))
-            (cond
-             [(null? new-moves)
-              (let ([all-changes (append m old-moves unincluded moved)])
-                (apply append (map disassemble-change all-changes)))]
-             [else
-              (let ([new-changes (filter (negate mod?) m)])
-                (loop new-changes
-                      (append new-moves old-moves unincluded moved)
-                      (add1 count)))])))]))))
+        (letv ([t (make-hasheq)]
+               [(m c) (diff-list t sorted-dels sorted-adds 0 #t)]
+               [new-moves (map mod->mov (filter mod? m))])
+          (printf "~n~a new moves found" (length new-moves))
+          (cond
+           [(null? new-moves)
+            (let ([all-changes (append m old-moves unincluded moved)])
+              (apply append (map disassemble-change all-changes)))]
+           [else
+            (let ([new-changes (filter (negate mod?) m)])
+              (loop new-changes
+                    (append new-moves old-moves unincluded moved)
+                    (add1 count)))]))))))
 
 
 (define language-specific-similar?

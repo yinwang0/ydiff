@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8'>
+
+  <title>yinwang0/ydiff @ GitHub</title>
+
+  <style type="text/css">
+    body {
+      margin-top: 1.0em;
+      background-color: white;
+      font-family: Helvetica, Arial, FreeSans, san-serif;
+      color: #000000;
+    }
+    #container {
+      margin: 0 auto;
+      width: 700px;
+    }
+    h1 { font-size: 3.8em; color: #384224; margin-bottom: 3px; }
+    h1 .small { font-size: 0.4em; }
+    h1 a { text-decoration: none }
+    h2 { font-size: 1.5em; color: #384224; }
+    h3 { text-align: center; color: #384224; }
+    a { color: #384224; }
+    .description { font-size: 1.2em; margin-bottom: 30px; margin-top: 30px; font-style: italic;}
+    .download { float: right; }
+    pre { background: #000; color: #fff; padding: 15px;}
+    hr { border: 0; width: 80%; border-bottom: 1px solid #aaa}
+    .footer { text-align:center; padding-top:30px; font-style: italic; }
+
+li {
+    padding-bottom: 8pt;
+}
+
+
+.deletion {
+    border: solid 1px #CC929A;
+    /* border: solid 1px #E6A4AE; */
+    background-color: LightPink;
+}
+
+.insertion {
+    border: solid 1px #73BE73;
+    /* border: solid 1px #82D682; */
+    background-color: LightGreen;
+}
+
+.change {
+    border: solid 1px #8AADB8;
+    /* border: solid 1px #9CC2CF; */
+    background-color: LightBlue;
+    cursor: pointer;
+}
+
+.move {
+    border: solid 1px LightPink;
+    /* border: solid 1px #BEBEBE; */
+    cursor: pointer;
+}
+
+.move-change {
+    border: solid 1px LightPink;
+    background-color: LightBlue;
+    /* border: solid 1px #BEBEBE; */
+    cursor: pointer;
+}
+
+.unchanged {
+    border: solid 1px #A9A9A9;
+    /* border: solid 1px #BEBEBE; */
+    cursor: pointer;
+}
+
+
+  </style>
+</head>
+
+<body>
+  <div id="container">
+    <h1><a href="http://github.com/yinwang0/ydiff">yDiff</a> </h1>
+
+    <div class="description">
+      a language-aware tool for comparing programs
+    </div>
+
+
+<a href="demos/demo1-demo2.html"><img src="gh-pages/compare-python.png"
+width="100%"/></a>
+
+
+<p>yDiff is a language-aware tool for comparing programs. It
+supports multiple languages and has an extensible design. It
+is not yet ready for general release although I already
+consider it an indispensible tool.
+
+
+<p>If you are brave enough, welcome to get its source code
+from
+github: <a href="http://github.com/yinwang0/ydiff">yinwang0/ydiff</a>.
+If you want to know more about it, welcome to read on and
+play with the interactive demos provided at the end of this
+page.
+
+
+
+<h2>Why yDiff?</h2>
+
+<p>We very often want to know how our code is modified. This
+is normally done by using the diff program. While effective
+for finding differences between close revisions, the result
+from diff can be very hard to read for revisions over a long
+time span. The worst case is when the code is massively
+rearranged or refactored, where diff considers every line to
+have been changed.
+
+
+<p>yDiff can help in this kind of situation. Different from
+line-based or character-based diff, yDiff is
+"language-based". It parses the programs and then performs
+structural comparison on the parse trees. In addition to the
+usual functionalities of diff, it has the following
+properties:
+
+
+
+<ul>
+
+<li><strong>Refactor detection</strong>. It can find
+renamed, moved, reordered, wrapped, lifted, combined or
+fragmented code.
+
+
+<li><strong>Deep structure extraction</strong>. Refactored
+code can be detected however deep they are buried in the
+structures.
+
+
+<li><strong>Code similarity assessment</strong>. It has an
+accurate and meaningful measure of code similarity.
+
+
+<li><strong>Format insensitivity</strong>. The comparison
+result will not be affected by linebreaks, whitespaces or
+comments.
+
+</ul>
+
+
+<p>These properties make yDiff very helpful for
+understanding changes. It may also be possible to use it for
+detecting plagiarism in programming classes or copyright
+infringement of code.
+
+
+
+<h2>Supported Languages</h2>
+
+<p>Currently yDiff supports the following languages:
+
+<ul>
+<li>Scheme
+<li>Emacs Lisp
+<li>Python
+<li>Javascript
+<li>C++
+</ul>
+
+<p>Because it contains a nicely designed parser combinator
+library, it is easy to extend it to other languages.
+
+
+
+<h2>License</h2>
+<p>GPL v3
+
+<h2>Authors</h2>
+<p>Yin Wang (yinwang0@gmail.com)<br/>      </p>
+
+
+
+<h2>Demos</h2>
+
+<p>You are welcome to have a look at the demos. They are fun
+to play with. The demos are interactive HTML files. All
+program structures are in framed nodes, whose colors mean:
+
+
+<ul>
+<li><span class="insertion">inserted</span>
+<li><span class="deletion">deleted</span>
+<li><span class="change">changed</span>
+<li><span class="move">moved</span>
+<li><span class="unchanged">unchanged</span>
+</ul>
+
+
+<p>The left and right windows are always locked in their relative
+position. A mouse click
+on <span class="change">changed</span>, <span class="move">moved</span>
+or <span class="unchanged">unchanged</span> nodes will highlight the
+matched nodes and scroll the other window to match. After that, the
+windows will be locked into their new relative position for browsing.
+
+
+<p>Okay, here are the demos:
+
+<ul>
+<li><a href="demos/mk-mk-c.html">Scheme</a>
+
+<p>Comparison of the
+original <a href="http://code.google.com/p/iucs-relational-research">miniKanren</a>
+from Professor Dan Friendman and the version I modified in
+order to support <em>condc</em>, a "negation operator",
+which fascinated me for quite some time. Pay attention to
+<code>unify</code>, whose major part is moved
+into <code>unify-good</code>, the righteous opponent
+of <code>unify-evil</code>.
+
+
+
+
+<li><a href="demos/paredit20-paredit22.html">Emacs Lisp</a>
+
+<p>Comparison of two versions (v20 and v22) of Taylor Campbell's
+<a href="http://mumble.net/~campbell/emacs/paredit.el">paredit-mode</a>,
+a wonderful tool for editing Lisp programs.
+
+
+
+<li><a href="demos/pass1-pass2.html">Arbitrary S-expressions</a>
+
+<p>Trying to find a bug in an optimizing pass of my Scheme
+compiler by comparing the IRs.
+
+
+
+<li><a href="demos/demo1-demo2.html">Python</a>
+
+<p>Comparison of two implementations of a small list library that I
+wrote, which implements Lisp-style lists. The first implementation
+uses recursive procedures while the second uses Python's generator
+syntax and is iterative. Pay some attention to <code>append</code>,
+whose code is moved inside another function <code>appendAll</code>.
+
+
+
+
+<li><a href="demos/nav-nav-div.html">Javascript</a>
+
+<p>Comparison between two major revisions of the UI code of
+yDiff itself.
+
+
+
+
+<li><a href="demos/d8-3404-d8-8424.html">C++ demo1</a>
+and <a href="demos/simulator-mips-simulator-arm.html">C++ demo2</a>
+
+<p>There are two demos for C++. The first demo compares two versions
+of the d8 Javascript debugger from
+the <a href="http://v8.googlecode.com">V8 project</a> (v3404 from 2009
+and the current v8424). The second demo compares V8's simulators for
+two different processors (MIPS and ARM).
+
+<p>The d8 demo is especially interesting because by clicking on the
+lines of the method <code>Shell::Initialize</code> in the old version,
+it can be clearly observed that its body has been distributed into
+several procedures in the new version:
+
+<pre>
+Shell::Initialize
+Shell::CreateGlobalTemplate
+Shell::RenewEvaluationContext
+Shell::InstallUtilityScript
+</pre>
+
+<p>Also the major part of <code>Shell::Main</code> is moved into the
+helper <code>Shell::RunMain</code>.
+
+
+</ul>
+
+
+    <div class="footer">
+      get the source code on GitHub : <a href="http://github.com/yinwang0/ydiff">yinwang0/ydiff</a>
+    </div>
+
+  </div>
+
+
+</body>
+</html>
