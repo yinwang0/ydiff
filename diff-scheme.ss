@@ -29,8 +29,6 @@
   '(define defun lambda cond if else let let* let-values let*-values
      while for define-syntax syntax-rules))
 
-(define *keyword-exchange* '())
-
 (define *defs*
   '(define defun define-syntax))
 

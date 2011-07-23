@@ -36,7 +36,6 @@
 ;-------------------------------------------------------------
 
 (define *keywords* '())
-(define *keyword-exchange* '())
 (define *defs* '())
 
 
@@ -89,14 +88,6 @@
 
 
 
-;; (node-equal?
-;;  (car (parse1 $expression "LineEditor::LineEditor"))
-;;  (car (parse1 $expression "LineEditor::LineEditor")))
-
-
-; (node-type (car (parse1 $expression "LineEditor::LineEditor")))
-
-
 ;; use name similarity to determine whether they are
 ;; differnet definitions
 (define different-def?
@@ -117,52 +108,6 @@
                             (node-size name2)))))]
           [else #f]))]
       [else #f])))
-
-
-
-;; (define language-specific-include?
-;;   (lambda (e)
-;;     (and (Expr? e)
-;;          (memq (Expr-type e)
-;;                '(
-;;                  signature
-;;                  name
-;;                  macro-definition
-;;                  if-statement
-;;                  switch-statement
-;;                  do-while-statement
-;;                  while-statement
-;;                  for-statement
-;;                  for-in-statement
-;;                  labelled-statement
-;;                  try-statement
-;;                  namespace-definition
-;;                  using-namespace
-;;                  class-definition
-;;                  function-definition
-;;                  parameters
-;;                  initializer
-;;                  function-declaration
-;;                  variable-definition
-;;                  enum-declaration
-;;                  expression-statement
-;;                  extended-assembly
-;;                  inline-assembly
-;;                  )))))
-
-
-
-;; (define language-specific-similar?
-;;   (lambda (e1 e2 c)
-;;     (let* ([size1 (node-size e1)]
-;;            [size2 (node-size e2)]
-;;            [total (+ size1 size2)])
-;;       (cond
-;;        [(and (Expr? e1) (Expr? e2)
-;;              (eq? 'name (Expr-type e1))
-;;              (eq? 'name (Expr-type e2)))
-;;         (= c 0)]
-;;        [else #f]))))
 
 
 

@@ -25,12 +25,11 @@
 ;-------------------------------------------------------------
 
 (define *move-ratio* 0)
-(define *move-size* 5)
+(define *move-size* 2)
 (define *max-string-len* 200)
 
 
 (define *keywords* '())
-(define *keyword-exchange* '())
 (define *defs* '())
 
 

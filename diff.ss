@@ -54,7 +54,6 @@
 
 
 (define *keywords* '())
-(define *keyword-exchange* '())
 (define *defs* '())
 
 
@@ -177,8 +176,6 @@
 ;; (map disassemble-change (extract-ins-frame n2 n1))
 
 
-
-
 (define ins-node-except
   (lambda (node1 node2)
     (let ([nodes (map (lambda (x)
@@ -220,66 +217,30 @@
 
 ;------------------ operations on nodes ---------------------
 
-(define node-equal?
-  (lambda (node1 node2)
-    (cond
-     [(and (null? node1) (null? node2)) #t]
-     [(and (Str? node1) (Str? node2))
-      (and (equal? (Str-s node1) (Str-s node2)))]
-     [(and (Comment? node1) (Comment? node2))
-      (and (equal? (Comment-text node1) (Comment-text node2)))]
-     [(and (Char? node1) (Char? node2))
-      (and (equal? (Char-c node1) (Char-c node2)))]
-     [(and (Token? node1) (Token? node2))
-      (and (equal? (Token-text node1)
-                   (Token-text node2)))]
-     [(and (Expr? node1) (Expr? node2))
-      (and (eq? (Expr-type node1)
-                (Expr-type node2))
-           (node-equal? (Expr-elts node1)
-                        (Expr-elts node2)))]
-     [(and (pair? node1) (pair? node2))
-      (and (node-equal? (car node1) (car node2))
-           (node-equal? (cdr node1) (cdr node2)))]
-     [else #f])))
-
-
-
-(define keyword-exchangeable?
-  (lambda (k1 k2)
-    (cond
-     [(eq? k1 k2) #t]
-     [(assq k1 *keyword-exchange*)
-      => (lambda (p)
-           (cond
-            [(memq k2 (cdr p)) #t]
-            [else #f]))]
-     [else #f])))
-
-
-
 (define keywords-equal?
   (lambda (node1 node2)
-    (and (eq? (Expr-type node1)
-              (Expr-type node2))
-         (not (keywords-differ? node1 node2)))))
+    (let ([k1 (get-keyword node1)]
+          [k2 (get-keyword node2)])
+      (eq? k1 k2))))
 
 
 
-(define keywords-differ?
-  (lambda (exp1 exp2)
-    (let ([key1 (and (not (null? (Expr-elts exp1)))
-                     (get-symbol (car (Expr-elts exp1))))]
-          [key2 (and (not (null? (Expr-elts exp2)))
-                     (get-symbol (car (Expr-elts exp2))))])
-      (cond
-       [(and key1 key2
-             (or (memq key1 *keywords*)
-                 (memq key2 *keywords*))
-             (not (keyword-exchangeable? key1 key2)))
-        #t]
-       [else #f]))))
+(define get-keyword
+  (lambda (node)
+    (match node
+      [(Expr type elts start end)
+       (cond
+        [(not (eq? type 'sexp)) type]
+        [(null? elts) #f]
+        [else
+         (let ([sym (get-symbol (car elts))])
+           (cond
+            [(memq sym *keywords*) sym]
+            [else #f]))])]
+      [_ #f])))
 
+
+; (get-keyword (car (parse-scheme "(let (x 1 a 1))")))
 
 
 (define get-symbol
@@ -308,7 +269,7 @@
       [else #f])))
 
 ;; (same-def? (car (parse-scheme "(define f 1)"))
-;;            (car (parse-scheme "(define g 1)")))
+;;            (car (parse-scheme "(define f 1)")))
 
 
 
@@ -375,10 +336,6 @@
 
 
 ; (node-depth (parse-scheme "(lambda (x (x (y)) (y)) x)"))
-
-;; (same-def? (parse-scheme "(define f (x 1))")
-;;            (parse-scheme "(define f 2"))
-
 
 
 (define uid
@@ -455,7 +412,6 @@
         (/ (* 2.0 char-dist) (+ len1 len2))]))))
 
 
-
 (define dist1
   (lambda (table s1 start1 s2 start2)
     (define memo
@@ -482,21 +438,6 @@
              [d3 (+ 1 (dist1 table s1 start1 s2 (add1 start2)))])
         (memo (min d1 d2 d3)))])))
 
-
-
-(define diff-string
-  (lambda (string1 string2 node1 node2)
-    (cond
-     [(or (> (string-length string1) *max-string-len*)
-          (> (string-length string2) *max-string-len*))
-      (cond
-       [(equal? string1 string2)
-        (values (mod-node node1 node2 0) 0)]
-       [else
-        (total node1 node2)])]
-     [else
-      (let ([cost (string-dist string1 string2)])
-        (values (mod-node node1 node2 cost) cost))])))
 
 
 
@@ -545,23 +486,37 @@
       (diff-string (Token-text node1) (Token-text node2) node1 node2)]
      [(and (Expr? node1) (Expr? node2)
            (keywords-equal? node1 node2))
-      (letv ([t (make-hasheq)]
-             [(m c) (diff-list t (Expr-elts node1) (Expr-elts node2)
+      (letv ([(m c) (diff-list (make-hasheq)
+                               (Expr-elts node1) (Expr-elts node2)
                                depth move?)])
         (trysub m c))]
      [(and (pair? node1) (not (pair? node2)))
-      (let ([t (make-hasheq)])
-        (diff-list t node1 (list node2) depth move?))]
+      (diff-list (make-hasheq) node1 (list node2) depth move?)]
      [(and (not (pair? node1)) (pair? node2))
-      (let ([t (make-hasheq)])
-        (diff-list t (list node1) node2 depth move?))]
+      (diff-list (make-hasheq) (list node1) node2 depth move?)]
      [(and (pair? node1) (pair? node2))
-      (let ([t (make-hasheq)])
-        (diff-list t node1 node2 depth move?))]
+      (diff-list (make-hasheq) node1 node2 depth move?)]
      [else
       (letv ([(m c) (total node1 node2)])
         (trysub m c))])))
 
+
+
+
+;; helper for nodes with string contents (Str, Comment, Token etc.)
+(define diff-string
+  (lambda (string1 string2 node1 node2)
+    (cond
+     [(or (> (string-length string1) *max-string-len*)
+          (> (string-length string2) *max-string-len*))
+      (cond
+       [(equal? string1 string2)
+        (values (mod-node node1 node2 0) 0)]
+       [else
+        (total node1 node2)])]
+     [else
+      (let ([cost (string-dist string1 string2)])
+        (values (mod-node node1 node2 cost) cost))])))
 
 
 
@@ -594,12 +549,6 @@
                    [cost2 (+ c2 (node-size (car ls1)))]
                    [cost3 (+ c3 (node-size (car ls2)))])
               (cond
-               ;; They can't be same-def now.
-               ;; don't move them. It is quite confusing
-
-               ;; [(and (not (different-def? (car ls1) (car ls2)))
-               ;;       (<= cost1 cost2) (<= cost1 cost3))
-               ;;  (memo (append m0 m1) cost1)]
                [(<= cost2 cost3)
                 (memo (append (del-node (car ls1)) m2) cost2)]
                [else
@@ -700,29 +649,15 @@
     (set! *diff-hash* (make-hasheq))
     (let loop ([changes changes] [moved '()] [count 1])
       (printf "~n[closure loop #~a] " count)
-      (let* ([del-changes (filter (predand del?
-                                           (predor (lambda (c)
-                                                     (language-specific-include?
-                                                      (Change-orig c)))
-                                                   big-change?))
-                                  changes)]
-             [add-changes (filter (predand ins?
-                                           (predor (lambda (c)
-                                                     (language-specific-include?
-                                                      (Change-cur c)))
-                                                   big-change?))
-                                  changes)]
+      (let* ([del-changes (filter (predand del? big-change?) changes)]
+             [add-changes (filter (predand ins? big-change?) changes)]
              [old-moves (filter mod? changes)]
-             [unincluded (set- changes (append old-moves
-                                               del-changes
-                                               add-changes))]
+             [unincluded (set- changes (append old-moves del-changes add-changes))]
              [dels (map Change-orig del-changes)]
              [adds (map Change-cur add-changes)]
              [sorted-dels (sort dels node-sort-fn)]
              [sorted-adds (sort adds node-sort-fn)])
-
-        (letv ([t (make-hasheq)]
-               [(m c) (diff-list t sorted-dels sorted-adds 0 #t)]
+        (letv ([(m c) (diff-list (make-hasheq) sorted-dels sorted-adds 0 #t)]
                [new-moves (map mod->mov (filter mod? m))])
           (printf "~n~a new moves found" (length new-moves))
           (cond
@@ -736,13 +671,7 @@
                     (add1 count)))]))))))
 
 
-(define language-specific-similar?
-  (lambda (e1 e2 c)
-    #f))
 
-(define language-specific-include?
-  (lambda (e)
-    #f))
 
 
 
