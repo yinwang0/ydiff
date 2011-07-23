@@ -1,0 +1,500 @@
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=utf-8">
+<LINK href="diff-s.css" rel="stylesheet" type="text/css">
+<script type="text/javascript" src="nav-div.js"></script>
+</head>
+<body>
+<div id="left" class="src">
+<pre>
+<a id='leftstart' tid='rightstart'></a>
+/////////////////////// debug flag ////////////////////////
+<span class="deletion" title="deleted">var debug = false;</span>
+
+
+/////////////////////// adjustable parameters //////////////////
+<span class="deletion" title="deleted">var minStep = 10;</span>
+<span class="deletion" title="deleted">var nSteps = 30;</span>
+<span class="deletion" title="deleted">var stepInterval = 10;</span>
+<span class="deletion" title="deleted">var blockRange = 15;</span>                    // how far consider one page blocked
+<span class="deletion" title="deleted">var nodeHLColor = &#39;lightgrey&#39;;</span>
+<span class="deletion" title="deleted">var lineHLColor = &#39;#FFFF66&#39;;</span>
+<span class="deletion" title="deleted">var lineBlockedColor = &#39;#E9AB17&#39;;</span>
+<span class="deletion" title="deleted">var bgColor = &#39;&#39;;</span>
+<span class="deletion" title="deleted">var bodyBlockedColor = &#39;#FAF0E6&#39;;</span>
+
+
+///////////////////////// globals ////////////////////////
+<span class="deletion" title="deleted">var eventCount = 0;</span>
+<span class="deletion" title="deleted">var moving = false;</span>
+<span class="deletion" title="deleted">var matchId = -1;</span>
+<span class="deletion" title="deleted">var matchLineId = -1;</span>
+<span class="deletion" title="deleted">var cTimeout;</span>
+
+
+///////////////////////// utilities ///////////////////////
+
+// No Math.sign() in JS?
+<a id='197' tid='198', class="move" title="(similarity 100%)">function</a> <a id='199' tid='200', class="move" title="(similarity 100%)">sign</a>(<a id='201' tid='202', class="move" title="(similarity 100%)">x</a>) {
+    <a id='203' tid='204', class="move" title="(similarity 100%)">if</a> (<a id='205' tid='206', class="move" title="(similarity 100%)">x</a> <a id='207' tid='208', class="move" title="(similarity 100%)">&gt;</a> <a id='209' tid='210', class="move" title="(similarity 100%)">0</a>) {
+        <a id='211' tid='212', class="move" title="(similarity 100%)">return</a> <a id='213' tid='214', class="move" title="(similarity 100%)">1</a>;
+    } <a id='215' tid='216', class="move" title="(similarity 100%)">else</a> <a id='217' tid='218', class="move" title="(similarity 100%)">if</a> (<a id='219' tid='220', class="move" title="(similarity 100%)">x</a> <a id='221' tid='222', class="move" title="(similarity 100%)">&lt;</a> <a id='223' tid='224', class="move" title="(similarity 100%)">0</a>) {
+        <a id='225' tid='226', class="move" title="(similarity 100%)">return</a> <a id='227' tid='228', class="move" title="(similarity 100%)">-</a><a id='229' tid='230', class="move" title="(similarity 100%)">1</a>;
+    } <a id='231' tid='232', class="move" title="(similarity 100%)">else</a> {
+        <a id='233' tid='234', class="move" title="(similarity 100%)">return</a> <a id='235' tid='236', class="move" title="(similarity 100%)">0</a>;
+    }
+}
+
+
+<span class="deletion" title="deleted">function log(msg) {
+    if (debug) {
+        console.log(&quot;[ &quot; + window.name + &quot; ] &quot; + msg);
+    }
+}</span>
+
+
+///////////////////// window scrolling stuff ////////////////////
+
+// accessing other window
+<span class="deletion" title="deleted">if (window.name == &#39;left&#39;) {
+    otherside = parent.right;
+} else {
+    otherside = parent.left;
+}</span>
+
+<a id='105' tid='106', class="move" title="(similarity 100%)">function</a> <a id='107' tid='108', class="move" title="(similarity 100%)">elementPosition</a>(<a id='109' tid='110', class="move" title="(similarity 100%)">id</a>) {
+    <a id='111' tid='112', class="move" title="(similarity 100%)">obj</a> <a id='113' tid='114', class="move" title="(similarity 100%)">=</a> <a id='115' tid='116', class="move" title="(similarity 100%)">document</a>.<a id='117' tid='118', class="move" title="(similarity 100%)">getElementById</a>(<a id='119' tid='120', class="move" title="(similarity 100%)">id</a>);
+    <a id='121' tid='122', class="move" title="(similarity 100%)">var</a> <a id='123' tid='124', class="move" title="(similarity 100%)">curleft</a> <a id='125' tid='126', class="move" title="(similarity 100%)">=</a> <a id='127' tid='128', class="move" title="(similarity 100%)">0</a>, <a id='129' tid='130', class="move" title="(similarity 100%)">curtop</a> <a id='131' tid='132', class="move" title="(similarity 100%)">=</a> <a id='133' tid='134', class="move" title="(similarity 100%)">0</a>;
+
+    <a id='135' tid='136', class="move" title="(similarity 100%)">if</a> (<a id='137' tid='138', class="move" title="(similarity 100%)">obj</a> <a id='139' tid='140', class="move" title="(similarity 100%)">&&</a> <a id='141' tid='142', class="move" title="(similarity 100%)">obj</a>.<a id='143' tid='144', class="move" title="(similarity 100%)">offsetParent</a>) {
+        <a id='145' tid='146', class="move" title="(similarity 100%)">curleft</a> <a id='147' tid='148', class="move" title="(similarity 100%)">=</a> <a id='149' tid='150', class="move" title="(similarity 100%)">obj</a>.<a id='151' tid='152', class="move" title="(similarity 100%)">offsetLeft</a>;
+        <a id='153' tid='154', class="move" title="(similarity 100%)">curtop</a> <a id='155' tid='156', class="move" title="(similarity 100%)">=</a> <a id='157' tid='158', class="move" title="(similarity 100%)">obj</a>.<a id='159' tid='160', class="move" title="(similarity 100%)">offsetTop</a>;
+
+        <a id='161' tid='162', class="move" title="(similarity 100%)">while</a> (<a id='163' tid='164', class="move" title="(similarity 100%)">obj</a> <a id='165' tid='166', class="move" title="(similarity 100%)">=</a> <a id='167' tid='168', class="move" title="(similarity 100%)">obj</a>.<a id='169' tid='170', class="move" title="(similarity 100%)">offsetParent</a>) {
+            <a id='171' tid='172', class="move" title="(similarity 100%)">curleft</a> <a id='173' tid='174', class="move" title="(similarity 100%)">+=</a> <a id='175' tid='176', class="move" title="(similarity 100%)">obj</a>.<a id='177' tid='178', class="move" title="(similarity 100%)">offsetLeft</a>;
+            <a id='179' tid='180', class="move" title="(similarity 100%)">curtop</a> <a id='181' tid='182', class="move" title="(similarity 100%)">+=</a> <a id='183' tid='184', class="move" title="(similarity 100%)">obj</a>.<a id='185' tid='186', class="move" title="(similarity 100%)">offsetTop</a>;
+        }
+    }
+
+    <a id='187' tid='188', class="move" title="(similarity 100%)">return</a> { <a id='189' tid='190', class="move" title="(similarity 100%)">x</a>: <a id='191' tid='192', class="move" title="(similarity 100%)">curleft</a>, <a id='193' tid='194', class="move" title="(similarity 100%)">y</a>: <a id='195' tid='196', class="move" title="(similarity 100%)">curtop</a> };
+}
+
+
+/*
+ * Scroll the window to relative position, detecting blocking positions.
+ */
+<span class="deletion" title="deleted">function</span> <span class="deletion" title="deleted">scrollWithBlockCheck</span>(<span class="deletion" title="deleted">distX, distY</span>) {
+    <span class="deletion" title="deleted">var oldTop = document.body.scrollTop;</span>
+    <span class="deletion" title="deleted">var oldLeft = document.body.scrollLeft;</span>
+
+    <span class="deletion" title="deleted">eventCount++;</span>
+    <span class="deletion" title="deleted">window.scrollBy(distX, distY);</span>      // the ONLY place for actual scrolling
+
+    <span class="deletion" title="deleted">var actualX = document.body.scrollLeft - oldLeft;</span>    
+    <span class="deletion" title="deleted">var actualY = document.body.scrollTop - oldTop;</span>
+    <a id='89' tid='90', class="move" title="(similarity 100%)">log</a>(<a id='91' tid='92', class="move" title="(similarity 100%)">&quot;distY=&quot;</a> <a id='93' tid='94', class="move" title="(similarity 100%)">+</a> <a id='95' tid='96', class="move" title="(similarity 100%)">distY</a> <a id='97' tid='98', class="move" title="(similarity 100%)">+</a> <a id='99' tid='100', class="move" title="(similarity 100%)">&quot;, actualY=&quot;</a> <a id='101' tid='102', class="move" title="(similarity 100%)">+</a> <a id='103' tid='104', class="move" title="(similarity 100%)">actualY</a>);
+
+    // extra leewaw here because Chrome scrolling is horribly inacurate
+    <span class="deletion" title="deleted">if</span> ((<a id='51' tid='52', class="move" title="(similarity 100%)">Math</a>.<a id='53' tid='54', class="move" title="(similarity 100%)">abs</a>(<a id='55' tid='56', class="move" title="(similarity 100%)">distX</a>) <a id='57' tid='58', class="move" title="(similarity 100%)">&gt;</a> <a id='59' tid='60', class="move" title="(similarity 100%)">blockRange</a> <a id='61' tid='62', class="move" title="(similarity 100%)">&&</a> <a id='63' tid='64', class="move" title="(similarity 100%)">actualX</a> <a id='65' tid='66', class="move" title="(similarity 100%)">==</a> <a id='67' tid='68', class="move" title="(similarity 100%)">0</a>)
+        <a id='69' tid='70', class="move" title="(similarity 100%)">||</a> <a id='71' tid='72', class="move" title="(similarity 100%)">Math</a>.<a id='73' tid='74', class="move" title="(similarity 100%)">abs</a>(<a id='75' tid='76', class="move" title="(similarity 100%)">distY</a>) <a id='77' tid='78', class="move" title="(similarity 100%)">&gt;</a> <a id='79' tid='80', class="move" title="(similarity 100%)">blockRange</a> <a id='81' tid='82', class="move" title="(similarity 100%)">&&</a> <a id='83' tid='84', class="move" title="(similarity 100%)">actualY</a> <a id='85' tid='86', class="move" title="(similarity 100%)">==</a> <a id='87' tid='88', class="move" title="(similarity 100%)">0</a>) <span class="deletion" title="deleted">{
+        log(&quot;blocked&quot;);
+        eventCount--;
+        document.body.style.backgroundColor = bodyBlockedColor;
+        putHighlight(matchLineId, lineBlockedColor);
+        with (otherside) {
+            putHighlight(matchLineId, lineBlockedColor);
+        }
+        return true;
+    }</span> <span class="deletion" title="deleted">else {
+        document.body.style.backgroundColor = bgColor;
+        otherside.document.body.style.backgroundColor = bgColor;
+        putHighlight(matchLineId, lineHLColor);
+        with (otherside) {
+            putHighlight(matchLineId, lineHLColor);
+        }
+        return false;
+    }</span>
+}
+
+
+/*
+ * timed animation function for scrolling the current window
+ */
+<span class="deletion" title="deleted">function</span> <span class="deletion" title="deleted">matchWindow</span>(<span class="deletion" title="deleted">n</span>)
+{
+    <span class="deletion" title="deleted">moving = true;</span>
+
+    <span class="deletion" title="deleted">var linkPos = otherside.elementPosition(otherside.matchId).y;</span>
+    <span class="deletion" title="deleted">var linkOffset = linkPos - otherside.document.body.scrollTop;</span>
+    <span class="deletion" title="deleted">var targetPos = document.body.scrollTop + linkOffset</span>
+    <span class="deletion" title="deleted">var curPos = elementPosition(matchId).y;</span>
+    <span class="deletion" title="deleted">var distY = curPos - targetPos;</span>
+    <span class="deletion" title="deleted">var distX = otherside.document.body.scrollLeft
+        - document.body.scrollLeft;</span>
+
+    <a id='35' tid='36', class="move" title="(similarity 100%)">log</a>(<a id='37' tid='38', class="move" title="(similarity 100%)">&quot;matching window... &quot;</a> <a id='39' tid='40', class="move" title="(similarity 100%)">+</a> <a id='41' tid='42', class="move" title="(similarity 100%)">n</a> <a id='43' tid='44', class="move" title="(similarity 100%)">+</a> <a id='45' tid='46', class="move" title="(similarity 100%)">&quot; distY=&quot;</a> <a id='47' tid='48', class="move" title="(similarity 100%)">+</a> <a id='49' tid='50', class="move" title="(similarity 100%)">distY</a>);
+
+    <span class="deletion" title="deleted">if</span> (<a id='21' tid='22', class="move" title="(similarity 100%)">distY</a> <a id='23' tid='24', class="move" title="(similarity 100%)">==</a> <a id='25' tid='26', class="move" title="(similarity 100%)">0</a> <a id='27' tid='28', class="move" title="(similarity 100%)">&&</a> <a id='29' tid='30', class="move" title="(similarity 100%)">distX</a> <a id='31' tid='32', class="move" title="(similarity 100%)">==</a> <a id='33' tid='34', class="move" title="(similarity 100%)">0</a>) <span class="deletion" title="deleted">{
+        moving = false;
+    }</span> <span class="deletion" title="deleted">else if (n &lt;= 1) {
+        scrollWithBlockCheck(distX, distY);
+        moving = false;        
+    } else{
+        var stepSize = Math.floor(Math.abs(distY) / n);
+        actualMinStep = Math.min(minStep, Math.abs(distY));
+        if (Math.abs(stepSize) &lt; minStep) {
+            var step = actualMinStep * sign(distY);
+        } else {
+            var step = stepSize * sign(distY);
+        }
+        var blocked = scrollWithBlockCheck(distX, step);
+        var rest = Math.floor(distY / step) - 1;
+        log(&quot;blocked?&quot; + blocked + &quot;, rest steps=&quot; + rest);
+        if (!blocked) {
+            cTimeout = setTimeout(&quot;matchWindow(&quot; + rest + &quot;)&quot;, stepInterval);
+        } else {
+            moving = false;
+        }
+    }</span>
+}
+
+
+////////////////////////// highlighting /////////////////////////////
+
+<a id='1' tid='2', class="move" title="(similarity 100%)">function</a> <a id='3' tid='4', class="move" title="(similarity 100%)">putHighlight</a>(<a id='5' tid='6', class="move" title="(similarity 100%)">id</a>, <a id='7' tid='8', class="move" title="(similarity 100%)">color</a>) {
+    <a id='9' tid='10', class="move" title="(similarity 100%)">var</a> <a id='11' tid='12', class="move" title="(similarity 100%)">elm</a> <a id='13' tid='14', class="move" title="(similarity 100%)">=</a> <a id='15' tid='16', class="move" title="(similarity 100%)">document</a>.<a id='17' tid='18', class="move" title="(similarity 100%)">getElementById</a>(<a id='19' tid='20', class="move" title="(similarity 100%)">id</a>);
+    <span class="deletion" title="deleted">if (elm != null) {
+        elm.style.backgroundColor = color;
+    }</span>
+}
+
+
+/*
+ * Highlight the link, target nodes and their lines,
+ * then start animation to move the other window to match.
+ */
+<span class="deletion" title="deleted">function highlight(linkId, targetId, linkLineId, targetLineId)
+{
+    putHighlight(matchId, bgColor);
+    putHighlight(matchLineId, bgColor);
+    putHighlight(linkId, nodeHLColor);
+    putHighlight(linkLineId, lineHLColor);
+
+    matchId = linkId;
+    matchLineId = linkLineId;
+
+    with (otherside) {
+        putHighlight(matchId, bgColor);
+        putHighlight(matchLineId, bgColor);
+        putHighlight(targetId, nodeHLColor);
+        putHighlight(targetLineId, lineHLColor);
+
+        matchId = targetId;
+        matchLineId = targetLineId;
+
+        cTimeout = setTimeout(&quot;matchWindow(&quot; + nSteps + &quot;)&quot; , stepInterval);
+    }
+}</span>
+
+
+//////////////////////////// event handling ////////////////////////////
+/*
+ * Making other side move instantly. Move other side only if:
+ * - I am not in an animation initiated by the other side (moving)
+ * - I do not have pending program-generated scroll events.
+ *
+ * Theoretically eventCount alone should work, but this is not the
+ * case with Safari, so the &#39;moving&#39; flag is necessary!
+ */
+<span class="deletion" title="deleted">function instantMoveOtherWindow (e) {
+    log(&quot;moving=&quot; + moving + &quot;, eventCount=&quot; + eventCount);
+    if (!moving && eventCount == 0) {
+        otherside.matchWindow(1);    
+    }
+    if (eventCount &gt; 0) {
+        eventCount--;
+    }
+    log(&quot;eventCount change=&quot; + eventCount);
+}</span>
+
+// Scroll and Resize event handlers
+<span class="deletion" title="deleted">window.onscroll = instantMoveOtherWindow</span>
+<span class="deletion" title="deleted">window.onresize = instantMoveOtherWindow</span>
+
+</pre>
+</div>
+<div id="right" class="src">
+<pre>
+<a id='rightstart' tid='leftstart'></a>
+// yDiff - a language-aware tool for comparing programs
+// Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
+
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.
+
+
+
+/////////////////////// debug flag ////////////////////////
+<span class="insertion" title="inserted">var debug = false;</span>
+
+
+/////////////////////// adjustable parameters //////////////////
+<span class="insertion" title="inserted">var minStep = 10;</span>
+<span class="insertion" title="inserted">var nSteps = 30;</span>
+<span class="insertion" title="inserted">var stepInterval = 10;</span>
+<span class="insertion" title="inserted">var blockRange = 5;</span>                    // how far consider one page blocked
+<span class="insertion" title="inserted">var nodeHLColor = &#39;yellow&#39;;</span>
+<span class="insertion" title="inserted">var lineHLColor = &#39;#FFFF66&#39;;</span>
+<span class="insertion" title="inserted">var lineBlockedColor = &#39;#E9AB17&#39;;</span>
+<span class="insertion" title="inserted">var bgColor = &#39;&#39;;</span>
+<span class="insertion" title="inserted">var bodyBlockedColor = &#39;#FAF0E6&#39;;</span>
+
+
+///////////////////////// globals ////////////////////////
+<span class="insertion" title="inserted">var eventCount = { &#39;left&#39; : 0, &#39;right&#39; : 0};</span>
+<span class="insertion" title="inserted">var moving = false;</span>
+<span class="insertion" title="inserted">var matchId1 = &#39;leftstart&#39;;</span>
+<span class="insertion" title="inserted">var matchId2 = &#39;rightstart&#39;;</span>
+<span class="insertion" title="inserted">var matchLineId1 = -1;</span>
+<span class="insertion" title="inserted">var matchLineId2 = -1;</span>
+<span class="insertion" title="inserted">var cTimeout;</span>
+
+
+///////////////////////// utilities ///////////////////////
+
+// No Math.sign() in JS?
+<a id='198' tid='197', class="move" title="(similarity 100%)">function</a> <a id='200' tid='199', class="move" title="(similarity 100%)">sign</a>(<a id='202' tid='201', class="move" title="(similarity 100%)">x</a>) {
+    <a id='204' tid='203', class="move" title="(similarity 100%)">if</a> (<a id='206' tid='205', class="move" title="(similarity 100%)">x</a> <a id='208' tid='207', class="move" title="(similarity 100%)">&gt;</a> <a id='210' tid='209', class="move" title="(similarity 100%)">0</a>) {
+        <a id='212' tid='211', class="move" title="(similarity 100%)">return</a> <a id='214' tid='213', class="move" title="(similarity 100%)">1</a>;
+    } <a id='216' tid='215', class="move" title="(similarity 100%)">else</a> <a id='218' tid='217', class="move" title="(similarity 100%)">if</a> (<a id='220' tid='219', class="move" title="(similarity 100%)">x</a> <a id='222' tid='221', class="move" title="(similarity 100%)">&lt;</a> <a id='224' tid='223', class="move" title="(similarity 100%)">0</a>) {
+        <a id='226' tid='225', class="move" title="(similarity 100%)">return</a> <a id='228' tid='227', class="move" title="(similarity 100%)">-</a><a id='230' tid='229', class="move" title="(similarity 100%)">1</a>;
+    } <a id='232' tid='231', class="move" title="(similarity 100%)">else</a> {
+        <a id='234' tid='233', class="move" title="(similarity 100%)">return</a> <a id='236' tid='235', class="move" title="(similarity 100%)">0</a>;
+    }
+}
+
+
+<span class="insertion" title="inserted">function log(msg) {
+    if (debug) {
+        console.log(msg);
+    }
+}</span>
+
+
+
+<a id='106' tid='105', class="move" title="(similarity 100%)">function</a> <a id='108' tid='107', class="move" title="(similarity 100%)">elementPosition</a>(<a id='110' tid='109', class="move" title="(similarity 100%)">id</a>) {
+    <a id='112' tid='111', class="move" title="(similarity 100%)">obj</a> <a id='114' tid='113', class="move" title="(similarity 100%)">=</a> <a id='116' tid='115', class="move" title="(similarity 100%)">document</a>.<a id='118' tid='117', class="move" title="(similarity 100%)">getElementById</a>(<a id='120' tid='119', class="move" title="(similarity 100%)">id</a>);
+    <a id='122' tid='121', class="move" title="(similarity 100%)">var</a> <a id='124' tid='123', class="move" title="(similarity 100%)">curleft</a> <a id='126' tid='125', class="move" title="(similarity 100%)">=</a> <a id='128' tid='127', class="move" title="(similarity 100%)">0</a>, <a id='130' tid='129', class="move" title="(similarity 100%)">curtop</a> <a id='132' tid='131', class="move" title="(similarity 100%)">=</a> <a id='134' tid='133', class="move" title="(similarity 100%)">0</a>;
+
+    <a id='136' tid='135', class="move" title="(similarity 100%)">if</a> (<a id='138' tid='137', class="move" title="(similarity 100%)">obj</a> <a id='140' tid='139', class="move" title="(similarity 100%)">&&</a> <a id='142' tid='141', class="move" title="(similarity 100%)">obj</a>.<a id='144' tid='143', class="move" title="(similarity 100%)">offsetParent</a>) {
+        <a id='146' tid='145', class="move" title="(similarity 100%)">curleft</a> <a id='148' tid='147', class="move" title="(similarity 100%)">=</a> <a id='150' tid='149', class="move" title="(similarity 100%)">obj</a>.<a id='152' tid='151', class="move" title="(similarity 100%)">offsetLeft</a>;
+        <a id='154' tid='153', class="move" title="(similarity 100%)">curtop</a> <a id='156' tid='155', class="move" title="(similarity 100%)">=</a> <a id='158' tid='157', class="move" title="(similarity 100%)">obj</a>.<a id='160' tid='159', class="move" title="(similarity 100%)">offsetTop</a>;
+
+        <a id='162' tid='161', class="move" title="(similarity 100%)">while</a> (<a id='164' tid='163', class="move" title="(similarity 100%)">obj</a> <a id='166' tid='165', class="move" title="(similarity 100%)">=</a> <a id='168' tid='167', class="move" title="(similarity 100%)">obj</a>.<a id='170' tid='169', class="move" title="(similarity 100%)">offsetParent</a>) {
+            <a id='172' tid='171', class="move" title="(similarity 100%)">curleft</a> <a id='174' tid='173', class="move" title="(similarity 100%)">+=</a> <a id='176' tid='175', class="move" title="(similarity 100%)">obj</a>.<a id='178' tid='177', class="move" title="(similarity 100%)">offsetLeft</a>;
+            <a id='180' tid='179', class="move" title="(similarity 100%)">curtop</a> <a id='182' tid='181', class="move" title="(similarity 100%)">+=</a> <a id='184' tid='183', class="move" title="(similarity 100%)">obj</a>.<a id='186' tid='185', class="move" title="(similarity 100%)">offsetTop</a>;
+        }
+    }
+
+    <a id='188' tid='187', class="move" title="(similarity 100%)">return</a> { <a id='190' tid='189', class="move" title="(similarity 100%)">x</a>: <a id='192' tid='191', class="move" title="(similarity 100%)">curleft</a>, <a id='194' tid='193', class="move" title="(similarity 100%)">y</a>: <a id='196' tid='195', class="move" title="(similarity 100%)">curtop</a> };
+}
+
+
+/*
+ * Scroll the window to relative position, detecting blocking positions.
+ */
+<span class="insertion" title="inserted">function</span> <span class="insertion" title="inserted">scrollWithBlockCheck</span>(<span class="insertion" title="inserted">container, distX, distY</span>) {
+    <span class="insertion" title="inserted">var oldTop = container.scrollTop;</span>
+    <span class="insertion" title="inserted">var oldLeft = container.scrollLeft;</span>
+
+    <span class="insertion" title="inserted">container.scrollTop += distY;</span>      // the ONLY place for actual scrolling
+    <span class="insertion" title="inserted">container.scrollLeft += distX;</span>
+
+    <span class="insertion" title="inserted">var actualX = container.scrollLeft - oldLeft;</span>
+    <span class="insertion" title="inserted">var actualY = container.scrollTop - oldTop;</span>
+    <a id='90' tid='89', class="move" title="(similarity 100%)">log</a>(<a id='92' tid='91', class="move" title="(similarity 100%)">&quot;distY=&quot;</a> <a id='94' tid='93', class="move" title="(similarity 100%)">+</a> <a id='96' tid='95', class="move" title="(similarity 100%)">distY</a> <a id='98' tid='97', class="move" title="(similarity 100%)">+</a> <a id='100' tid='99', class="move" title="(similarity 100%)">&quot;, actualY=&quot;</a> <a id='102' tid='101', class="move" title="(similarity 100%)">+</a> <a id='104' tid='103', class="move" title="(similarity 100%)">actualY</a>);
+    <span class="insertion" title="inserted">log(&quot;distX=&quot; + distX + &quot;, actualX=&quot; + actualX);</span>
+
+    // extra leewaw here because Chrome scrolling is horribly inacurate
+    <span class="insertion" title="inserted">if</span> ((<a id='52' tid='51', class="move" title="(similarity 100%)">Math</a>.<a id='54' tid='53', class="move" title="(similarity 100%)">abs</a>(<a id='56' tid='55', class="move" title="(similarity 100%)">distX</a>) <a id='58' tid='57', class="move" title="(similarity 100%)">&gt;</a> <a id='60' tid='59', class="move" title="(similarity 100%)">blockRange</a> <a id='62' tid='61', class="move" title="(similarity 100%)">&&</a> <a id='64' tid='63', class="move" title="(similarity 100%)">actualX</a> <a id='66' tid='65', class="move" title="(similarity 100%)">==</a> <a id='68' tid='67', class="move" title="(similarity 100%)">0</a>)
+        <a id='70' tid='69', class="move" title="(similarity 100%)">||</a> <a id='72' tid='71', class="move" title="(similarity 100%)">Math</a>.<a id='74' tid='73', class="move" title="(similarity 100%)">abs</a>(<a id='76' tid='75', class="move" title="(similarity 100%)">distY</a>) <a id='78' tid='77', class="move" title="(similarity 100%)">&gt;</a> <a id='80' tid='79', class="move" title="(similarity 100%)">blockRange</a> <a id='82' tid='81', class="move" title="(similarity 100%)">&&</a> <a id='84' tid='83', class="move" title="(similarity 100%)">actualY</a> <a id='86' tid='85', class="move" title="(similarity 100%)">==</a> <a id='88' tid='87', class="move" title="(similarity 100%)">0</a>) <span class="insertion" title="inserted">{
+        log(&quot;blocked&quot;);
+        container.style.backgroundColor = bodyBlockedColor;
+        return true;
+    }</span> <span class="insertion" title="inserted">else {
+        eventCount[container.id]++;
+        container.style.backgroundColor = bgColor;
+        return false;
+    }</span>
+}
+
+
+<span class="insertion" title="inserted">function getContainer(elm) {
+    while (elm && elm.tagName != &#39;DIV&#39;) {
+        elm = elm.parentElement || elm.parentNode;
+    }
+    return elm;
+}</span>
+
+
+/*
+ * timed animation function for scrolling the current window
+ */
+<span class="insertion" title="inserted">function</span> <span class="insertion" title="inserted">matchWindow</span>(<span class="insertion" title="inserted">linkId, targetId, n</span>)
+{
+    <span class="insertion" title="inserted">moving = true;</span>
+
+    <span class="insertion" title="inserted">var link = document.getElementById(linkId);</span>
+    <span class="insertion" title="inserted">var target = document.getElementById(targetId);</span>
+    <span class="insertion" title="inserted">var linkContainer = getContainer(link);</span>
+    <span class="insertion" title="inserted">var targetContainer = getContainer(target);</span>
+
+    <span class="insertion" title="inserted">var linkPos = elementPosition(linkId).y - linkContainer.scrollTop;</span>
+    <span class="insertion" title="inserted">var targetPos = elementPosition(targetId).y - targetContainer.scrollTop;</span>
+    <span class="insertion" title="inserted">var distY = targetPos - linkPos;</span>
+    <span class="insertion" title="inserted">var distX = linkContainer.scrollLeft - targetContainer.scrollLeft;</span>
+
+
+    <a id='36' tid='35', class="move" title="(similarity 100%)">log</a>(<a id='38' tid='37', class="move" title="(similarity 100%)">&quot;matching window... &quot;</a> <a id='40' tid='39', class="move" title="(similarity 100%)">+</a> <a id='42' tid='41', class="move" title="(similarity 100%)">n</a> <a id='44' tid='43', class="move" title="(similarity 100%)">+</a> <a id='46' tid='45', class="move" title="(similarity 100%)">&quot; distY=&quot;</a> <a id='48' tid='47', class="move" title="(similarity 100%)">+</a> <a id='50' tid='49', class="move" title="(similarity 100%)">distY</a> <span class="insertion" title="inserted">+</span> <span class="insertion" title="inserted">&quot; distX=&quot;</span> <span class="insertion" title="inserted">+</span> <span class="insertion" title="inserted">distX</span>);
+
+    <span class="insertion" title="inserted">if</span> (<a id='22' tid='21', class="move" title="(similarity 100%)">distY</a> <a id='24' tid='23', class="move" title="(similarity 100%)">==</a> <a id='26' tid='25', class="move" title="(similarity 100%)">0</a> <a id='28' tid='27', class="move" title="(similarity 100%)">&&</a> <a id='30' tid='29', class="move" title="(similarity 100%)">distX</a> <a id='32' tid='31', class="move" title="(similarity 100%)">==</a> <a id='34' tid='33', class="move" title="(similarity 100%)">0</a>) <span class="insertion" title="inserted">{
+        clearTimeout(cTimeout);
+        moving = false;
+    }</span> <span class="insertion" title="inserted">else if (n &lt;= 1) {
+        scrollWithBlockCheck(targetContainer, distX, distY);
+        moving = false;
+    } else {
+        var stepSize = Math.floor(Math.abs(distY) / n);
+        actualMinStep = Math.min(minStep, Math.abs(distY));
+        if (Math.abs(stepSize) &lt; minStep) {
+            var step = actualMinStep * sign(distY);
+        } else {
+            var step = stepSize * sign(distY);
+        }
+        var blocked = scrollWithBlockCheck(targetContainer, distX, step);
+        var rest = Math.floor(distY / step) - 1;
+        log(&quot;blocked?&quot; + blocked + &quot;, rest steps=&quot; + rest);
+        if (!blocked) {
+            cTimeout = setTimeout(&quot;matchWindow(&quot; + linkId + &quot;,&quot; + targetId + &quot;,&quot;
+                                  + rest + &quot;)&quot;, stepInterval);
+        } else {
+            clearTimeout(cTimeout);
+            moving = false;
+        }
+    }</span>
+}
+
+
+
+////////////////////////// highlighting /////////////////////////////
+
+<span class="insertion" title="inserted">var highlighted = []</span>
+<a id='2' tid='1', class="move" title="(similarity 100%)">function</a> <a id='4' tid='3', class="move" title="(similarity 100%)">putHighlight</a>(<a id='6' tid='5', class="move" title="(similarity 100%)">id</a>, <a id='8' tid='7', class="move" title="(similarity 100%)">color</a>) {
+    <a id='10' tid='9', class="move" title="(similarity 100%)">var</a> <a id='12' tid='11', class="move" title="(similarity 100%)">elm</a> <a id='14' tid='13', class="move" title="(similarity 100%)">=</a> <a id='16' tid='15', class="move" title="(similarity 100%)">document</a>.<a id='18' tid='17', class="move" title="(similarity 100%)">getElementById</a>(<a id='20' tid='19', class="move" title="(similarity 100%)">id</a>);
+    <span class="insertion" title="inserted">if (elm != null) {
+        elm.style.backgroundColor = color;
+        if (color != bgColor) {
+            highlighted.push(id);
+        }
+    }</span>
+}
+
+
+<span class="insertion" title="inserted">function clearHighlight() {
+    for (i = 0; i &lt; highlighted.length; i++) {
+        putHighlight(highlighted[i], bgColor);
+    }
+    highlighted = [];
+}</span>
+
+
+
+/*
+ * Highlight the link, target nodes and their lines,
+ * then start animation to move the other window to match.
+ */
+<span class="insertion" title="inserted">function highlight(me, linkId, targetId, linkLineId, targetLineId)
+{
+    if (me.id == &#39;left&#39;) {
+        matchId1 = linkId;
+        matchId2 = targetId;
+    } else {
+        matchId1 = targetId;
+        matchId2 = linkId;
+    }
+
+    clearHighlight();
+
+    putHighlight(linkId, nodeHLColor);
+    putHighlight(targetId, nodeHLColor);
+    putHighlight(linkLineId, lineHLColor);
+    putHighlight(targetLineId, lineHLColor);
+
+    matchWindow(linkId, targetId, nSteps);
+}</span>
+
+
+<span class="insertion" title="inserted">function instantMoveOtherWindow (me) {
+    log(&quot;me=&quot; + me.id + &quot;, eventcount=&quot; + eventCount[me.id]);
+    log(&quot;matchId1=&quot; + matchId1 + &quot;, matchId2=&quot; + matchId2);
+
+    me.style.backgroundColor = bgColor;
+
+    if (!moving && eventCount[me.id] == 0) {
+        if (me.id == &#39;left&#39;) {
+            matchWindow(matchId1, matchId2, 1);
+        } else {
+            matchWindow(matchId2, matchId1, 1);
+        }
+    }
+    if (eventCount[me.id] &gt; 0) {
+        eventCount[me.id] -= 1;
+    }
+}</span>
+
+
+<span class="insertion" title="inserted">function getTarget(x){
+    x = x || window.event;
+    return x.target || x.srcElement;
+}</span>
+
+
+<span class="insertion" title="inserted">window.onload =
+    function (e) {
+        var tags = document.getElementsByTagName(&quot;A&quot;)
+        for (var i = 0; i &lt; tags.length; i++) {
+            tags[i].onclick =
+                function (e) {
+                    var t = getTarget(e)
+                    var lid = t.id
+                    var tid = t.getAttribute(&#39;tid&#39;)
+                    var container = getContainer(t)
+                    highlight(container, lid, tid, &#39;ignore&#39;, &#39;ignore&#39;)
+                }
+        }
+
+        tags = document.getElementsByTagName(&quot;DIV&quot;)
+        for (var i = 0; i &lt; tags.length; i++) {
+            tags[i].onscroll =
+                function (e) {
+                    instantMoveOtherWindow(getTarget(e))
+                }
+        }
+
+    }</span>
+
+</pre>
+</div>
+</body>
+</html>

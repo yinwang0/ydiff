@@ -175,6 +175,6 @@
 
 
 ;---------------------------------------------
-; (diff-cpp "simulator-mips.cc" "simulator-arm.cc")
+; (diff-cpp "tests/simulator-mips.cc" "tests/simulator-arm.cc")
 ; (diff-cpp "tests/d8-3404.cc" "tests/d8-8424.cc")
 
