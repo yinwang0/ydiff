@@ -103,16 +103,17 @@
       (values (append (del-node node1) (ins-node node2))
               (+ size1 size2)))))
 
+
 (define del-node
   (lambda (node)
     (let ([size (node-size node)])
       (list (Change node #f size 'del)))))
 
+
 (define ins-node
   (lambda (node)
     (let ([size (node-size node)])
       (list (Change #f node size 'ins)))))
-
 
 
 (define disassemble-frame
@@ -148,7 +149,6 @@
       [_ fatal 'extract-frame "I only accept Expr"])))
 
 
-
 (define extract-ins-frame
   (lambda (node1 node2)
     (let ([frame (extract-frame node1 node2)])
@@ -156,7 +156,6 @@
        [(not frame) '()]
        [else
         (ins-node frame)]))))
-
 
 
 (define extract-del-frame
@@ -168,12 +167,10 @@
         (del-node frame)]))))
 
 
-
 ;; (define n1 (Token "ok" 0 1))
-
 ;; (define n2 (Expr 'ok (list n1 (Token "bar" 1 2)) 0 2))
-
 ;; (map disassemble-change (extract-ins-frame n2 n1))
+
 
 
 (define ins-node-except
@@ -196,14 +193,15 @@
       (apply append nodes))))
 
 
-
 (define mod-node
   (lambda (node1 node2 cost)
     (list (Change node1 node2 cost 'mod))))
 
+
 (define mov-node
   (lambda (node1 node2 cost)
     (list (Change node1 node2 cost 'mov))))
+
 
 (define mod->mov
   (lambda (c)
@@ -254,19 +252,16 @@
 
 (define same-def?
   (lambda (e1 e2)
-    (cond
-      [(and (Expr? e1) (Expr? e2))
-       (let ([elts1 (Expr-elts e1)]
-             [elts2 (Expr-elts e2)])
-         (cond
-          [(and (> (length elts1) 1)
-                (> (length elts2) 1)
-                (memq (get-symbol (car elts1)) *defs*)
-                (memq (get-symbol (car elts2)) *defs*))
-           (eq? (get-symbol (cadr elts1))
-                (get-symbol (cadr elts2)))]
-          [else #f]))]
-      [else #f])))
+    (let ([key1 (get-keyword e1)]
+          [key2 (get-keyword e2)])
+      (cond
+       [(and key1 key2 
+             (memq key1 *defs*)
+             (memq key2 *defs*))
+        (eq? (get-symbol (cadr (Expr-elts e1)))
+             (get-symbol (cadr (Expr-elts e2))))]
+       [else #f]))))
+
 
 ;; (same-def? (car (parse-scheme "(define f 1)"))
 ;;            (car (parse-scheme "(define f 1)")))
@@ -275,22 +270,18 @@
 
 (define different-def?
   (lambda (e1 e2)
-    (cond
-      [(and (Expr? e1) (Expr? e2))
-       (let ([elts1 (Expr-elts e1)]
-             [elts2 (Expr-elts e2)])
-         (cond
-          [(and (> (length elts1) 1)
-                (> (length elts2) 1)
-                (memq (get-symbol (car elts1)) *defs*)
-                (memq (get-symbol (car elts2)) *defs*))
-           (not (eq? (get-symbol (cadr elts1))
-                     (get-symbol (cadr elts2))))]
-          [else #f]))]
-      [else #f])))
+    (let ([key1 (get-keyword e1)]
+          [key2 (get-keyword e2)])
+      (cond
+       [(and key1 key2 
+             (memq key1 *defs*)
+             (memq key2 *defs*))
+        (not (eq? (get-symbol (cadr (Expr-elts e1)))
+                  (get-symbol (cadr (Expr-elts e2)))))]
+       [else #f]))))
 
 ;; (different-def? (car (parse-scheme "(define f 1)"))
-;;                 (car (parse-scheme "(let f 1)")))
+;;                 (car (parse-scheme "(define g 1)")))
 
 
 
@@ -468,6 +459,7 @@
              [else
               (memo m c)]))])))
 
+    ;; progress bar
     (diff-progress 1)
 
     (cond
@@ -572,8 +564,7 @@
 
 
 
-
-
+;;----------------- structure extraction ------------------
 (define diff-sub
   (lambda (node1 node2 depth move?)
     (cond
@@ -582,7 +573,7 @@
       (values #f #f)]
      [(and (Expr? node1) (Expr? node2))
       (cond
-       [(< (node-size node1) (node-size node2))
+       [(<= (node-size node1) (node-size node2))
         (let loop ([elts2 (Expr-elts node2)])
           (cond
            [(null? elts2) (values #f #f)]
@@ -596,7 +587,7 @@
                   (values (append m0 frame) c0))]
                [else
                 (loop (cdr elts2))]))]))]
-       [(> (node-size node1) (node-size node2))
+       [else
         (let loop ([elts1 (Expr-elts node1)])
           (cond
            [(null? elts1) (values #f #f)]
@@ -609,9 +600,7 @@
                       [frame-size (- (node-size node1) (node-size (car elts1)))])
                   (values (append m0 frame) c0))]
                [else
-                (loop (cdr elts1))]))]))]
-       [else                            ; equal size
-        (values #f #f)])]
+                (loop (cdr elts1))]))]))])]
      [else (values #f #f)])))
 
 

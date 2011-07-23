@@ -20,8 +20,8 @@
 (load "diff.ss")
 
 
-(define *move-ratio* 0)
-(define *move-size* 10)
+(define *move-ratio* 0.1)
+(define *move-size* 5)
 (define *max-string-len* 200)
 
 
