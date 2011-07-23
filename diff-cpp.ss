@@ -27,7 +27,6 @@
 
 (define *move-ratio* 0)
 (define *move-size* 7)
-(define *max-string-len* 200)
 
 
 

@@ -44,7 +44,7 @@
 ;; strings but the most accurate method to use. This
 ;; parameter affects strings/comments only. We use accurate
 ;; string comparison for all Tokens.
-(define *max-string-len* 200)
+(define *max-string-len* 0)
 
 
 ;; only memoize the diff of nodes of size larger than this

@@ -20,9 +20,8 @@
 (load "diff.ss")
 
 
-(define *move-ratio* 0.1)
+(define *move-ratio* 0)
 (define *move-size* 5)
-(define *max-string-len* 200)
 
 
 (define *keywords*
@@ -30,7 +29,7 @@
      while for define-syntax syntax-rules))
 
 (define *defs*
-  '(define defun define-syntax))
+  '(define defun defvar define-syntax))
 
 
 
