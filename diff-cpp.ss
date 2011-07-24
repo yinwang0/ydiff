@@ -48,18 +48,6 @@
 
 ; (get-name (car (parse1 $statement "int f(int x) {}")))
 
-;; (Expr-elts
-;;  (get-property
-;;   (get-property
-;;    (get-property
-;;     (get-property (car (parse1 $statement "int f(int x) {}"))
-;;                   'signature)
-;;     'name)
-;;    'identifier)
-;;   'id))
-
-
-
 ;; (same-def? (car (parse1 $statement "int f(int x) {}"))
 ;;            (car (parse1 $statement "int f(int x) {}")))
 
