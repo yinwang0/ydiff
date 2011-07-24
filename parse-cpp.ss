@@ -56,7 +56,7 @@
 (::= $identifier 'identifier
      (@? ($$ "::"))
      (@* $id (@* $type-parameter) ($$ "::"))
-     (@? ($$ "~")) $id)
+     (@= 'id (@? ($$ "~")) $id))
 
 
 ;; (::= $identifier 'identifier

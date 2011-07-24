@@ -454,16 +454,14 @@
       (diff-string (Token-text node1) (Token-text node2) node1 node2)]
      [(and (Expr? node1) (Expr? node2)
            (eq? (get-type node1) (get-type node2)))
-      (letv ([(m c) (diff-list (make-hasheq)
-                               (Expr-elts node1) (Expr-elts node2)
-                               depth move?)])
+      (letv ([(m c) (diff-list (Expr-elts node1) (Expr-elts node2) depth move?)])
         (trysub m c))]
      [(and (pair? node1) (not (pair? node2)))
-      (diff-list (make-hasheq) node1 (list node2) depth move?)]
+      (diff-list node1 (list node2) depth move?)]
      [(and (not (pair? node1)) (pair? node2))
-      (diff-list (make-hasheq) (list node1) node2 depth move?)]
+      (diff-list (list node1) node2 depth move?)]
      [(and (pair? node1) (pair? node2))
-      (diff-list (make-hasheq) node1 node2 depth move?)]
+      (diff-list node1 node2 depth move?)]
      [else
       (letv ([(m c) (total node1 node2)])
         (trysub m c))])))
@@ -494,6 +492,21 @@
 (define *diff-hash* (make-hasheq))
 
 (define diff-list
+  (lambda (ls1 ls2 depth move?)
+    (letv ([ls1-named (filter (lambda (x) (get-name x)) ls1)]
+           [ls2-named (filter (lambda (x) (get-name x)) ls2)]
+           [ls1-unnamed (set- ls1 ls1-named)]
+           [ls2-unnamed (set- ls2 ls2-named)]
+           [ls1-named-sort (sort ls1-named node-sort-fn)]
+           [ls2-named-sort (sort ls2-named node-sort-fn)]
+           [ls1-unnamed-sort (sort ls1-unnamed node-sort-fn)]
+           [ls2-unnamed-sort (sort ls2-unnamed node-sort-fn)]
+           [(m1 c1) (diff-list1 (make-hasheq) ls1-named-sort ls2-named-sort depth move?)]
+           [(m2 c2) (diff-list1 (make-hasheq) ls1-unnamed-sort ls2-unnamed-sort depth move?)])
+      (values (append m1 m2) (+ c1 c2)))))
+
+
+(define diff-list1
   (lambda (table ls1 ls2 depth move?)
 
     (define memo
@@ -504,7 +517,7 @@
     (define guess
       (lambda (ls1  ls2)
         (letv ([(m0 c0) (diff-node (car ls1) (car ls2) depth move?)]
-               [(m1 c1) (diff-list table (cdr ls1) (cdr ls2) depth move?)]
+               [(m1 c1) (diff-list1 table (cdr ls1) (cdr ls2) depth move?)]
                [(cost1) (+ c0 c1)])
           (cond
            [(or (same-def? (car ls1) (car ls2))
@@ -512,8 +525,8 @@
                      (similar? (car ls1) (car ls2) c0)))
             (memo (append m0 m1) cost1)]
            [else
-            (letv ([(m2 c2) (diff-list table (cdr ls1) ls2  depth move?)]
-                   [(m3 c3) (diff-list table ls1 (cdr ls2) depth move?)]
+            (letv ([(m2 c2) (diff-list1 table (cdr ls1) ls2  depth move?)]
+                   [(m3 c3) (diff-list1 table ls1 (cdr ls2) depth move?)]
                    [cost2 (+ c2 (node-size (car ls1)))]
                    [cost3 (+ c3 (node-size (car ls2)))])
               (cond
@@ -605,7 +618,18 @@
 
 (define node-sort-fn
   (lambda (x y)
-    (< (get-start x) (get-start y))))
+    (let ([name1 (get-name x)]
+          [name2 (get-name y)])
+      (cond
+       [(or (not (symbol? name1))
+            (not (symbol? name2)))
+        (< (get-start x) (get-start y))]
+       [(and name1 name2)
+        (string<? (symbol->string name1)
+                  (symbol->string name2))]
+       [(and name1 (not name2)) #t]
+       [(and (not name1) name2) #f]))))
+
 
 
 ;; iterate diff-list on the list of changes
@@ -622,7 +646,7 @@
              [adds (map Change-cur add-changes)]
              [sorted-dels (sort dels node-sort-fn)]
              [sorted-adds (sort adds node-sort-fn)])
-        (letv ([(m c) (diff-list (make-hasheq) sorted-dels sorted-adds 0 #t)]
+        (letv ([(m c) (diff-list sorted-dels sorted-adds 0 #t)]
                [new-moves (map mod->mov (filter mod? m))])
           (printf "~n~a new moves found" (length new-moves))
           (cond
