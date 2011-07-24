@@ -39,9 +39,7 @@
     (let ([id-exp
            (get-property
             (get-property
-             (get-property
-              (get-property node 'signature)
-              'name)
+             (get-property node 'name)
              'identifier)
             'id)])
       (and id-exp (get-symbol (car (Expr-elts id-exp)))))))

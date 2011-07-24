@@ -501,8 +501,10 @@
            [ls2-named-sort (sort ls2-named node-sort-fn)]
            [ls1-unnamed-sort (sort ls1-unnamed node-sort-fn)]
            [ls2-unnamed-sort (sort ls2-unnamed node-sort-fn)]
-           [(m1 c1) (diff-list1 (make-hasheq) ls1-named-sort ls2-named-sort depth move?)]
-           [(m2 c2) (diff-list1 (make-hasheq) ls1-unnamed-sort ls2-unnamed-sort depth move?)])
+           [(m1 c1) (diff-list1 (make-hasheq) ls1-named-sort ls2-named-sort 
+                                depth move?)]
+           [(m2 c2) (diff-list1 (make-hasheq) ls1-unnamed-sort ls2-unnamed-sort
+                                depth move?)])
       (values (append m1 m2) (+ c1 c2)))))
 
 

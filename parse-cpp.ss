@@ -199,11 +199,11 @@
      (@* (@= 'declspec
              (@or ($$ "_declspec") ($$ "__declspec")) |(|  $expression  |)|))
 
-     (@or (@= 'signature (@= 'name $identifier |;| ))
+     (@or (@= 'name $identifier |;| )
 
           (@...
-              (@= 'signature (@= 'name (@? $identifier))) (@? (@... (@_ ":") $base-clause))
-              (@= 'body  |{|  (@* $statement)  |}|) )
+           (@= 'name (@? $identifier)) (@? (@... (@_ ":") $base-clause))
+           (@= 'body  |{|  (@* $statement)  |}|) )
           ))
 
 
@@ -226,23 +226,21 @@
 ;;---------- function definition and declaration ------------
 
 (::= $function-declaration 'function-declaration
-     (@= 'signature
-         (@? ($$ "typedef"))
-         (@? $access-specifier) (@? $modifiers) (@? $type)
-         (@= 'name (@or $identifier
-                        (@... |(| ($$ "*") $identifier |)|)) )
-         $formal-parameter-list)
+     (@? ($$ "typedef"))
+     (@? $access-specifier) (@? $modifiers) (@? $type)
+     (@= 'name (@or $identifier
+                    (@... |(| ($$ "*") $identifier |)|)) )
+     $formal-parameter-list
      (@? ($$ "const"))
      (@? $initializer)
 )
 
 
 (::= $function-definition 'function
-     (@= 'signature
-         (@or (@... (@? $modifiers) $type
-                    (@= 'name $identifier ) $formal-parameter-list)
+     (@or (@... (@? $modifiers) $type
+                (@= 'name $identifier ) $formal-parameter-list)
 
-              (@... (@= 'name $identifier ) $formal-parameter-list)))
+          (@... (@= 'name $identifier ) $formal-parameter-list))
      (@? $initializer)
      $function-body)
 
