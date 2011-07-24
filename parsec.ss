@@ -84,6 +84,14 @@
               "unrecognized node: " node)])))
 
 
+(define get-symbol
+  (lambda (node)
+    (cond
+     [(Token? node)
+      (string->symbol (Token-text node))]
+     [else #f])))
+
+
 (define get-property
   (lambda (e type)
     (cond

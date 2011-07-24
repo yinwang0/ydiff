@@ -42,14 +42,6 @@
   '(define defun defvar define-syntax define-minor-mode))
 
 
-(define get-symbol
-  (lambda (node)
-    (cond
-     [(Token? node)
-      (string->symbol (Token-text node))]
-     [else #f])))
-
-
 ;; helper for get-type
 (define get-keyword
   (lambda (node)

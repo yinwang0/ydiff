@@ -39,22 +39,20 @@
 (define *move-size* 5)
 
 
-;; How long must a string be in order for us to use
-;; string-dist function, which is costly when used on long
-;; strings but the most accurate method to use. This
-;; parameter affects strings/comments only. We use accurate
-;; string comparison for all Tokens.
+;; How long must a string be in order for us to use string-dist
+;; function, which is costly when used on long strings but the most
+;; accurate method to use. Currently this parameter is set to 0,
+;; effective disables all LCS string comparison. This improves
+;; performance while not sacrificing much accuracy because the
+;; algorithm is AST based.
 (define *max-string-len* 0)
 
 
-;; only memoize the diff of nodes of size larger than this
-;; number
+;; Only memoize the diff of nodes of size larger than this number.
+;; This effectively reduces memory usage.
 (define *memo-node-size* 2)
 
 
-
-(define *keywords* '())
-(define *defs* '())
 
 
 
@@ -73,6 +71,7 @@
 
 
 
+
 ;-------------------------------------------------------------
 ;                      data types
 ;-------------------------------------------------------------
@@ -83,25 +82,23 @@
 
 (define ins?
   (lambda (c)
-    (not (Change-orig c))))
+    (eq? 'ins (Change-type c))))
 
 (define del?
   (lambda (c)
-    (not (Change-cur c))))
+    (eq? 'del (Change-type c))))
 
 (define mod?
   (lambda (c)
-    (and (Change-orig c) (Change-cur c))))
+    (eq? 'mod (Change-type c))))
 
 
 
 ;----------------- utils for creating changes ----------------
-(define total
-  (lambda (node1 node2)
-    (let ([size1 (node-size node1)]
-          [size2 (node-size node2)])
-      (values (append (del-node node1) (ins-node node2))
-              (+ size1 size2)))))
+(define ins-node
+  (lambda (node)
+    (let ([size (node-size node)])
+      (list (Change #f node size 'ins)))))
 
 
 (define del-node
@@ -110,12 +107,35 @@
       (list (Change node #f size 'del)))))
 
 
-(define ins-node
-  (lambda (node)
-    (let ([size (node-size node)])
-      (list (Change #f node size 'ins)))))
+(define mod-node
+  (lambda (node1 node2 cost)
+    (list (Change node1 node2 cost 'mod))))
 
 
+(define mov-node
+  (lambda (node1 node2 cost)
+    (list (Change node1 node2 cost 'mov))))
+
+
+;; create a "total change". (delete node1 and insert node2)
+(define total
+  (lambda (node1 node2)
+    (let ([size1 (node-size node1)]
+          [size2 (node-size node2)])
+      (values (append (del-node node1) (ins-node node2))
+              (+ size1 size2)))))
+
+
+(define mod->mov
+  (lambda (c)
+    (match c
+     [(Change node1 node2 cost 'mod)
+      (Change node1 node2 cost 'mov)]
+     [other other])))
+
+
+
+;;------------------ frames utils --------------------
 (define disassemble-frame
   (lambda (node)
     (cond
@@ -173,49 +193,12 @@
 
 
 
-(define ins-node-except
-  (lambda (node1 node2)
-    (let ([nodes (map (lambda (x)
-                        (if (not (eq? x node2))
-                            (ins-node x)
-                            '()))
-                      (Expr-elts node1))])
-      (apply append nodes))))
-
-
-(define del-node-except
-  (lambda (node1 node2)
-    (let ([nodes (map (lambda (x)
-                        (if (not (eq? x node2))
-                            (del-node x)
-                            '()))
-                      (Expr-elts node1))])
-      (apply append nodes))))
-
-
-(define mod-node
-  (lambda (node1 node2 cost)
-    (list (Change node1 node2 cost 'mod))))
-
-
-(define mov-node
-  (lambda (node1 node2 cost)
-    (list (Change node1 node2 cost 'mov))))
-
-
-(define mod->mov
-  (lambda (c)
-    (match c
-     [(Change node1 node2 cost 'mod)
-      (Change node1 node2 cost 'mov)]
-     [other other])))
-
 
 
 
 ;------------------ operations on nodes ---------------------
 
-;; get definition name
+;; "virtual function" - get definition name
 ;; should be overridden by different languages
 (define get-name
   (lambda (node)
@@ -225,6 +208,7 @@
 
 
 
+;; "virtual function" - get node type
 (define get-type
   (lambda (node)
     (cond
@@ -268,6 +252,8 @@
                              (node-size node2))))))
 
 
+
+;----------- node size function ------------
 (define *node-size-hash* (make-hasheq))
 
 (define node-size
@@ -321,6 +307,7 @@
 
 
 
+;; similarity string from a change
 (define similarity
   (lambda (change)
     (let ([total (+ (node-size (Change-orig change))
@@ -337,7 +324,7 @@
 
 
 ;-------------------------------------------------------------
-;                        diff stuff
+;                       diff proper
 ;-------------------------------------------------------------
 
 ; 2-D memoization table
@@ -409,7 +396,7 @@
 
 
 
-;--------------------- main node diff function ----------------------
+;--------------------- the primary diff function -------------------
 (define diff-node
   (lambda (node1 node2 depth move?)
 
@@ -555,7 +542,7 @@
 
 
 
-;;----------------- structure extraction ------------------
+;; structure extraction
 (define diff-sub
   (lambda (node1 node2 depth move?)
     (cond
@@ -824,7 +811,7 @@
     (line port "</div>")))
 
 
-;; progress bar :-)
+;; poor man's progress bar
 (define diff-progress
   (new-progress 10000))
 
@@ -859,7 +846,7 @@
                                      #:mode 'text
                                      #:exists 'replace)]
              [end (current-seconds)])
-        (printf "\nfinished in ~a seconds~n" (- end start))
+        (printf "finished in ~a seconds~n" (- end start))
 
         (html-header port)
         (write-html port tagged1 "left")
