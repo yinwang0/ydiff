@@ -484,19 +484,9 @@
 
 (define diff-list
   (lambda (ls1 ls2 depth move?)
-    (letv ([ls1-named (filter (lambda (x) (get-name x)) ls1)]
-           [ls2-named (filter (lambda (x) (get-name x)) ls2)]
-           [ls1-unnamed (set- ls1 ls1-named)]
-           [ls2-unnamed (set- ls2 ls2-named)]
-           [ls1-named-sort (sort ls1-named node-sort-fn)]
-           [ls2-named-sort (sort ls2-named node-sort-fn)]
-           [ls1-unnamed-sort (sort ls1-unnamed node-sort-fn)]
-           [ls2-unnamed-sort (sort ls2-unnamed node-sort-fn)]
-           [(m1 c1) (diff-list1 (make-hasheq) ls1-named-sort ls2-named-sort
-                                depth move?)]
-           [(m2 c2) (diff-list1 (make-hasheq) ls1-unnamed-sort ls2-unnamed-sort
-                                depth move?)])
-      (values (append m1 m2) (+ c1 c2)))))
+    (let ([ls1 (sort ls1 node-sort-fn)]
+          [ls2 (sort ls2 node-sort-fn)])
+      (diff-list1 (make-hasheq) ls1 ls2 depth move?))))
 
 
 (define diff-list1
@@ -614,14 +604,13 @@
     (let ([name1 (get-name x)]
           [name2 (get-name y)])
       (cond
-       [(or (not (symbol? name1))
-            (not (symbol? name2)))
-        (< (get-start x) (get-start y))]
        [(and name1 name2)
         (string<? (symbol->string name1)
                   (symbol->string name2))]
        [(and name1 (not name2)) #t]
-       [(and (not name1) name2) #f]))))
+       [(and (not name1) name2) #f]
+       [else
+        (< (get-start x) (get-start y))]))))
 
 
 
@@ -732,7 +721,7 @@
 
 (define span-start
   (lambda (change side)
-    (let ([cls (if (Change-orig change) "d" "i")])
+    (let ([cls (if (eq? 'del (Change-type change)) "d" "i")]) ; del or ins
       (string-append "<span class=" (qs cls) ">"))))
 
 
