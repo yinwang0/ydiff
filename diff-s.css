@@ -17,39 +17,39 @@
 
 
 
-.deletion {
+.d {
     border: solid 1px #CC929A;
     /* border: solid 1px #E6A4AE; */
     background-color: LightPink;
 }
 
-.insertion {
+.i {
     border: solid 1px #73BE73;
     /* border: solid 1px #82D682; */
     background-color: LightGreen;
 }
 
-.change {
+.c {
     border: solid 1px #8AADB8;
     /* border: solid 1px #9CC2CF; */
     background-color: LightBlue;
     cursor: pointer;
 }
 
-.move {
+.m {
     border: solid 1px LightPink;
     /* border: solid 1px #BEBEBE; */
     cursor: pointer;
 }
 
-.move-change {
+.mc {
     border: solid 1px LightPink;
     background-color: LightBlue;
     /* border: solid 1px #BEBEBE; */
     cursor: pointer;
 }
 
-.unchanged {
+.u {
     border: solid 1px #A9A9A9;
     /* border: solid 1px #BEBEBE; */
     cursor: pointer;

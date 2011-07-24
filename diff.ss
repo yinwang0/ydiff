@@ -62,7 +62,11 @@
 
 (define qs
   (lambda (x)
-    (string-append "'" (number->string x) "'")))
+    (let ([x (cond
+              [(symbol? x) (symbol->string x)]
+              [(number? x) (number->string x)]
+              [(string? x) x])])
+      (string-append "'" x "'"))))
 
 
 (define line
@@ -488,7 +492,7 @@
            [ls2-named-sort (sort ls2-named node-sort-fn)]
            [ls1-unnamed-sort (sort ls1-unnamed node-sort-fn)]
            [ls2-unnamed-sort (sort ls2-unnamed node-sort-fn)]
-           [(m1 c1) (diff-list1 (make-hasheq) ls1-named-sort ls2-named-sort 
+           [(m1 c1) (diff-list1 (make-hasheq) ls1-named-sort ls2-named-sort
                                 depth move?)]
            [(m2 c2) (diff-list1 (make-hasheq) ls1-unnamed-sort ls2-unnamed-sort
                                 depth move?)])
@@ -708,11 +712,10 @@
     (let ([cls (cond
                 [(and (eq? (Change-type change) 'mov)
                       (> (Change-cost change) 0))
-                 "move-change"]
-                [(eq? (Change-type change) 'mov) "move"]
-                [(> (Change-cost change) 0) "change"]
-                [else "unchanged"])]
-          [text (string-append "(similarity " (similarity change) ")")]
+                 "mc"]                                     ; move-change
+                [(eq? (Change-type change) 'mov) "m"]      ; move
+                [(> (Change-cost change) 0) "c"]           ; change
+                [else "u"])]                               ; unchanged
           [me (if (eq? side 'left)
                   (Change-orig change)
                   (Change-cur change))]
@@ -720,18 +723,17 @@
                   (Change-cur change)
                   (Change-orig change))])
       (string-append
-       "<a id="   (qs (uid me))
-       " tid=" (qs (uid other)) ","
-       " class=\""  cls   "\""
-       " title=\""  text  "\">"))))
+       "<a id="  (qs (uid me))
+       " tid="   (qs (uid other))
+       " class=" (qs cls)
+       ">"))))
 
 
 
 (define span-start
   (lambda (change side)
-    (let ([cls (if (Change-orig change) "deletion" "insertion")]
-          [text (if (Change-orig change) "deleted" "inserted")])
-      (string-append "<span class=\"" cls "\" title=\"" text "\">"))))
+    (let ([cls (if (Change-orig change) "d" "i")])
+      (string-append "<span class=" (qs cls) ">"))))
 
 
 
@@ -748,8 +750,7 @@
   '((#\"  .   "&quot;")
     (#\'  .    "&#39;")
     (#\<  .    "&lt;")
-    (#\>  .    "&gt;")
-    ))
+    (#\>  .    "&gt;")))
 
 
 (define escape
