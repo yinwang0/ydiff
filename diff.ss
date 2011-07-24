@@ -215,73 +215,49 @@
 
 ;------------------ operations on nodes ---------------------
 
-(define keywords-equal?
-  (lambda (node1 node2)
-    (let ([k1 (get-keyword node1)]
-          [k2 (get-keyword node2)])
-      (eq? k1 k2))))
-
-
-
-(define get-keyword
+;; get definition name
+;; should be overridden by different languages
+(define get-name
   (lambda (node)
-    (match node
-      [(Expr type elts start end)
-       (cond
-        [(not (eq? type 'sexp)) type]
-        [(null? elts) #f]
-        [else
-         (let ([sym (get-symbol (car elts))])
-           (cond
-            [(memq sym *keywords*) sym]
-            [else #f]))])]
-      [_ #f])))
+    #f))
+
+; (get-name (car (parse-scheme "(defvar f 1)")))
 
 
-; (get-keyword (car (parse-scheme "(let (x 1 a 1))")))
 
-
-(define get-symbol
+(define get-type
   (lambda (node)
     (cond
-     [(Token? node)
-      (string->symbol (Token-text node))]
-     [else #f])))
+     [(Expr? node) (Expr-type node)]
+     [(Token? node) 'token]
+     [(Comment? node) 'comment]
+     [(Str? node) 'str]
+     [(Char? node) 'char])))
 
 
 
 (define same-def?
   (lambda (e1 e2)
-    (let ([key1 (get-keyword e1)]
-          [key2 (get-keyword e2)])
-      (cond
-       [(and key1 key2 
-             (memq key1 *defs*)
-             (memq key2 *defs*))
-        (eq? (get-symbol (cadr (Expr-elts e1)))
-             (get-symbol (cadr (Expr-elts e2))))]
-       [else #f]))))
-
-
-;; (same-def? (car (parse-scheme "(define f 1)"))
-;;            (car (parse-scheme "(define f 1)")))
+    (cond
+     [(not (eq? (get-type e1) (get-type e2)))
+      #f]
+     [else
+      (let ([name1 (get-name e1)]
+            [name2 (get-name e2)])
+        (and name1 name2 (equal? name1 name2)))])))
 
 
 
 (define different-def?
   (lambda (e1 e2)
-    (let ([key1 (get-keyword e1)]
-          [key2 (get-keyword e2)])
-      (cond
-       [(and key1 key2 
-             (memq key1 *defs*)
-             (memq key2 *defs*))
-        (not (eq? (get-symbol (cadr (Expr-elts e1)))
-                  (get-symbol (cadr (Expr-elts e2)))))]
-       [else #f]))))
+    (cond
+     [(not (eq? (get-type e1) (get-type e2)))
+      #f]
+     [else
+      (let ([name1 (get-name e1)]
+            [name2 (get-name e2)])
+        (and name1 name2 (not (equal? name1 name2))))])))
 
-;; (different-def? (car (parse-scheme "(define f 1)"))
-;;                 (car (parse-scheme "(define g 1)")))
 
 
 
@@ -477,7 +453,7 @@
      [(and (Token? node1) (Token? node2))
       (diff-string (Token-text node1) (Token-text node2) node1 node2)]
      [(and (Expr? node1) (Expr? node2)
-           (keywords-equal? node1 node2))
+           (eq? (get-type node1) (get-type node2)))
       (letv ([(m c) (diff-list (make-hasheq)
                                (Expr-elts node1) (Expr-elts node2)
                                depth move?)])
@@ -502,7 +478,7 @@
      [(or (> (string-length string1) *max-string-len*)
           (> (string-length string2) *max-string-len*))
       (cond
-       [(equal? string1 string2)
+       [(string=? string1 string2)
         (values (mod-node node1 node2 0) 0)]
        [else
         (total node1 node2)])]
@@ -632,7 +608,7 @@
     (< (get-start x) (get-start y))))
 
 
-;; iterate the dynamic programming
+;; iterate diff-list on the list of changes
 (define closure
   (lambda (changes)
     (set! *diff-hash* (make-hasheq))
@@ -836,7 +812,8 @@
 (define diff
   (lambda (file1 file2 parse)
     (cleanup)
-    (letv ([s1 (read-file file1)]
+    (letv ([start (current-seconds)]
+           [s1 (read-file file1)]
            [s2 (read-file file2)]
            [node1 (parse s1)]
            [node2 (parse s2)]
@@ -854,7 +831,10 @@
                                         (base-name file2) ".html")]
              [port (open-output-file frame-file
                                      #:mode 'text
-                                     #:exists 'replace)])
+                                     #:exists 'replace)]
+             [end (current-seconds)])
+        (printf "\nfinished in ~a seconds~n" (- end start))
+
         (html-header port)
         (write-html port tagged1 "left")
         (write-html port tagged2 "right")

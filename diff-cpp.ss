@@ -22,92 +22,29 @@
 
 
 ;-------------------------------------------------------------
-;                       diff settings
+;                       settings
 ;-------------------------------------------------------------
 
 (define *move-ratio* 0)
-(define *move-size* 7)
+(define *move-size* 5)
 
 
 
 ;-------------------------------------------------------------
-;                 parameters for the scanner
+;                      overrides
 ;-------------------------------------------------------------
 
-(define *keywords* '())
-(define *defs* '())
+(define get-name
+  (lambda (node)
+    (get-property (get-property node 'signature) 'name)))
 
 
-
-;-------------------------------------------------------------
-;                      redefinitions
-;-------------------------------------------------------------
-
-(define get-property
-  (lambda (e type)
-    (cond
-     [(not (Expr? e)) #f]
-     [else
-      (let ([matches (filter (lambda (x) (and (Expr? x)
-                                              (eq? (Expr-type x) type)))
-                             (Expr-elts e))])
-        (cond
-         [(null? matches) #f]
-         [else (car matches)]))])))
+;; (same-def? (car (parse1 $statement "int f(int x) {}"))
+;;            (car (parse1 $statement "int f(int x) {}")))
 
 
-(define same-def?
-  (lambda (e1 e2)
-    (cond
-      [(and (Expr? e1) (Expr? e2)
-            (or (and (eq? (Expr-type e1) 'function)
-                     (eq? (Expr-type e2) 'function))
-                (and (eq? (Expr-type e1) 'class)
-                     (eq? (Expr-type e2) 'class))))
-       (let ([name1 (get-property (get-property e1 'signature) 'name)]
-             [name2 (get-property (get-property e2 'signature) 'name)])
-         (and name1 name2 (node-equal? name1 name2)))]
-      [else #f])))
-
-
-; (same-def? (Token "foo" 0 1) (Token "foo" 0 1))
-
-
-;; (same-def?
-;;  (Expr 'function (list (Expr 'name (list "foo") 0 4)) 0 10)
-;;  (Expr 'function (list (Expr 'name (list "foo") 0 4)) 0 10))
-
-;; (same-def?
-;;  (car (parse1 $statement
-;;               (read-file "t1.cc")
-;;    ))
-;;  (car (parse1 $statement
-;;               (read-file "t2.cc")
-;;    )))
-
-
-
-;; use name similarity to determine whether they are
-;; differnet definitions
-(define different-def?
-  (lambda (e1 e2)
-    (cond
-      [(and (Expr? e1) (Expr? e2)
-            (or (and (eq? (Expr-type e1) 'function)
-                     (eq? (Expr-type e2) 'function))
-                (and (eq? (Expr-type e1) 'class)
-                     (eq? (Expr-type e2) 'class))))
-       (let ([name1 (get-property (get-property e1 'signature) 'name)]
-             [name2 (get-property (get-property e2 'signature) 'name)])
-         (cond
-          [(and name1 name2)
-           (not (equal? name1 name2))
-           (letv ([(m c) (diff-node name1 name2 0 #t)])
-             (> c (* 0 (+ (node-size name1)
-                            (node-size name2)))))]
-          [else #f]))]
-      [else #f])))
-
+;; (different-def? (car (parse1 $statement "int f(int x) {}"))
+;;                 (car (parse1 $statement "int g(int x) {}")))
 
 
 

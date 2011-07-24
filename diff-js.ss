@@ -25,12 +25,25 @@
 ;-------------------------------------------------------------
 
 (define *move-ratio* 0)
-(define *move-size* 2)
+(define *move-size* 5)
 
 
-(define *keywords* '())
-(define *defs* '())
 
+;-------------------------------------------------------------
+;                         overrides
+;-------------------------------------------------------------
+
+(define get-name
+  (lambda (node)
+    (get-property node 'name)))
+
+
+;; (same-def? (car (parse1 $statement "function f(x) {}"))
+;;            (car (parse1 $statement "function f(x) {}")))
+
+
+;; (different-def? (car (parse1 $statement "function f(x) {}"))
+;;                 (car (parse1 $statement "function g(x) {}")))
 
 
 ;---------------------------------------------

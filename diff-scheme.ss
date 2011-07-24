@@ -20,16 +20,87 @@
 (load "diff.ss")
 
 
+;-------------------------------------------------------------
+;                         settings
+;-------------------------------------------------------------
+
 (define *move-ratio* 0)
 (define *move-size* 5)
 
 
+;-------------------------------------------------------------
+;                         overrides
+;-------------------------------------------------------------
+
 (define *keywords*
-  '(define defun lambda cond if else let let* let-values let*-values
-     while for define-syntax syntax-rules))
+  '(define defun defvar lambda cond if else
+     let let* let-values let*-values
+     while for define-syntax syntax-rules
+     define-minor-mode))
 
 (define *defs*
-  '(define defun defvar define-syntax))
+  '(define defun defvar define-syntax define-minor-mode))
+
+
+(define get-symbol
+  (lambda (node)
+    (cond
+     [(Token? node)
+      (string->symbol (Token-text node))]
+     [else #f])))
+
+
+;; helper for get-type
+(define get-keyword
+  (lambda (node)
+    (match node
+      [(Expr type elts start end)
+       (cond
+        [(null? elts) #f]
+        [else
+         (let ([sym (get-symbol (car elts))])
+           (cond
+            [(memq sym *keywords*) sym]
+            [else #f]))])]
+      [_ #f])))
+
+
+; (get-keyword (car (parse-scheme "(defvar f 1)")))
+
+
+;; We need to override get-type because
+;; S-expression-based languages are flexible about their
+;; syntax and don't have rigid types attached to their AST
+;; nodes.
+
+;; override
+(define get-type
+  (lambda (node)
+    (cond
+     [(Expr? node)
+      (get-keyword node)]
+     [(Token? node) 'token]
+     [(Comment? node) 'comment]
+     [(Str? node) 'str]
+     [(Char? node) 'char])))
+
+
+
+;; override
+(define get-name
+  (lambda (node)
+    (let ([key (get-keyword node)])
+      (cond
+       [(and key (memq key *defs*))
+        (get-symbol (cadr (Expr-elts node)))]
+       [else #f]))))
+
+
+;; (same-def? (car (parse-scheme "(define f 1)"))
+;;            (car (parse-scheme "(define f 1)")))
+
+;; (different-def? (car (parse-scheme "(define f 1)"))
+;;                 (car (parse-scheme "(define g 1)")))
 
 
 

@@ -84,6 +84,17 @@
               "unrecognized node: " node)])))
 
 
+(define get-property
+  (lambda (e type)
+    (cond
+     [(not (Expr? e)) #f]
+     [else
+      (let ([matches (filter (lambda (x) (and (Expr? x)
+                                              (eq? (Expr-type x) type)))
+                             (Expr-elts e))])
+        (cond
+         [(null? matches) #f]
+         [else (car matches)]))])))
 
 
 
