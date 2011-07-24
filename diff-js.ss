@@ -35,7 +35,13 @@
 
 (define get-name
   (lambda (node)
-    (get-property node 'name)))
+    (let ([id-exp
+           (get-property
+            (get-property
+             (get-property node 'name)
+             'identifier)
+            'id)])
+      (and id-exp (get-symbol (car (Expr-elts id-exp)))))))
 
 
 ;; (same-def? (car (parse1 $statement "function f(x) {}"))
