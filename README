@@ -1,19 +1,20 @@
 * How to build and use
 
 ydiff is implemented in Scheme. The Scheme implementation I'm using
-for this project is Racket. You can find it from
+for this project is Racket. You can get it from
 http://racket-lang.org.
 
 ydiff supports multiple languages but currently it is not cleanly
 modularized for different languages. There are global parameters set
-by each language's parser. I should remove them later.
+by each language's parser which need to be reset when switching
+languages. I should remove them later.
 
 Currently there is no Unix command line interface. In order to use it,
 you need to load the 'diff-<lang>.ss' files in the Racket repl before
 invoking the diff-<lang> functions. For example:
 
 (load "diff-scheme.ss")
-(diff-<lang> "file1.ss" "file2.ss")
+(diff-scheme "file1.ss" "file2.ss")
 
 You need to reload the 'diff-<lang>.ss' file once you have switched to
 other languages.
@@ -36,4 +37,3 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
