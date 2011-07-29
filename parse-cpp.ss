@@ -180,12 +180,12 @@
 
 
 (::= $namespace-definition 'namespace
-     (@~ "namespace") $identifier
+     ($$ "namespace") $identifier
      |{|  (@* $statement)  |}|
 )
 
 (::= $using-namespace 'using-namespace
-     (@~ "using") (@~ "namespace") $identifier)
+     ($$ "using") ($$ "namespace") $identifier)
 
 
 

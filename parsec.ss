@@ -18,8 +18,9 @@
 
 (load "utils.ss")
 
-(define *debug* #f)
 (define *left-recur-detection* #f)
+
+
 
 
 ;-------------------------------------------------------------
@@ -34,6 +35,7 @@
 (define *comment-end*    "")
 (define *operators*  '())
 (define *quotation-marks*  '(#\"))
+(define *lisp-char* '())
 (define *significant-whitespaces* '())
 
 
@@ -115,7 +117,7 @@
 (define digit?       char-numeric?)
 
 
-; Is char c a delim?
+; Is char c a delimeter?
 (define delim?
   (lambda (c)
     (member (char->string c) *delims*)))
@@ -256,7 +258,7 @@
            [(start-with-one-of s start *quotation-marks*)   ; string
             => (lambda (q) (scan-string s start q))]
 
-           [(start-with-one-of s start (list "#\\" "?\\")) ; scheme/elisp char
+           [(start-with-one-of s start *lisp-char*) ; scheme/elisp char
             (cond
              [(<= (string-length s) (+ 2 start))
               (error 'scan-string "reached EOF while scanning char")]
@@ -339,6 +341,15 @@
 
 
 
+(define ext
+  (lambda (u v stk)
+    (cond
+     [(not *left-recur-detection*) stk]
+     [else
+      (cons (cons u v) stk)])))
+
+
+
 (define stack->string
   (lambda (stk)
     (let ([ps (map
@@ -347,15 +358,6 @@
       (string-join ps "\n"))))
 
 ; (display (stack->string (onstack? 'x 'y '((u . v) (x . y) (w . t)))))
-
-
-
-(define ext
-  (lambda (u v stk)
-    (cond
-     [(not *left-recur-detection*) stk]
-     [else
-      (cons (cons u v) stk)])))
 
 
 
@@ -374,6 +376,7 @@
                   "stack trace: " (stack->string t)))]
      [else
       ((parser) toks (ext parser toks stk) ctx)])))
+
 
 
 
@@ -561,6 +564,9 @@
 ; (((@and (@or ($$ "[") ($$ "{")) (@! ($$ "{")))) (scan "["))
 
 
+
+;; parses the parsers ps normally, but "globs" the parses and doesn't
+;; put them into the output.
 (define $glob
   (lambda ps
     (let ([parser ((apply @... ps))])
@@ -590,6 +596,10 @@
 
 
 
+;; A phantom is something that takes space but invisible. It is useful
+;; for something whose position is important, but is meaningless to
+;; show up in the AST. It is used mostly for delimeters. $phantom is
+;; seldom used directly. The helper @~ creates a phantom from strings.
 (define $phantom
   (lambda ps
     (let ([parser ((apply @... ps))])
@@ -624,7 +634,7 @@
       (values '() toks))))
 
 
-
+;; succeeds if the predicate 'proc' returns true for the first token.
 (define $pred
   (lambda (proc)
     (lambda ()
@@ -641,6 +651,7 @@
   ($glob ($pred (lambda (t) (eq? t 'eof)))))
 
 
+;; literal parser for tokens. for example ($$ "for")
 (define $$
   (lambda (s)
     ($pred
@@ -666,6 +677,7 @@
       (cons (car ps) (cons sep (join (cdr ps) sep)))])))
 
 
+;; a list of parser p separated by sep
 (define @.@
   (lambda (p sep)
     (@... p (@* (@... sep p)))))
@@ -673,18 +685,17 @@
 
 
 ;; ($eval (@.@ ($$ "foo") ($$ ","))
-;;        (scan "foo, foo,foo "))
+;;        (scan "foo, foo, foo"))
 
 
 
 
 
 ;-------------------------------------------------------------
-;                  associaltive expressions
+;                  expression parser combinators
 ;-------------------------------------------------------------
 
-
-;; construct left-associative infix expression
+;; helper for constructing left-associative infix expression
 (define constr-exp-l
   (lambda (type fields)
     (let loop ([fields (cdr fields)] [ret (car fields)])
@@ -697,7 +708,7 @@
              (loop (cddr fields) e))]))))
 
 
-;; construct right-associative infix expression
+;; helper for constructing right-associative infix expression
 (define constr-exp-r
   (lambda (type fields)
     (let ([fields (reverse fields)])
@@ -711,6 +722,9 @@
                (loop (cddr fields) e))])))))
 
 
+
+;; helper for creating infix operator parser. used by @infix-left and
+;; @infix-right
 (define @infix
   (lambda (type p op associativity)
     (lambda ()
@@ -822,11 +836,14 @@
 
 
 
-;;----------------- syntax extensions --------------------
+;-------------------------------------------------------------
+;                   syntactic extensions
+;-------------------------------------------------------------
 
 (define *parse-hash* (make-hasheq))
 
 
+;; define an unnamed parser
 (define-syntax ::
   (syntax-rules ()
     [(_ name expr)
@@ -844,6 +861,7 @@
 
 
 
+;; define a named parser
 (define-syntax ::=
   (syntax-rules ()
     [(_ name type expr ...)
@@ -890,7 +908,7 @@
 
 
 
-;; fail if in avoid-ctx
+;; succeed only in a context that is NOT avoid-ctx
 (define-syntax ::!
   (syntax-rules ()
     [(_ name avoid-ctx expr)
@@ -909,6 +927,7 @@
                (values t r))]))))]))
 
 
+;; EXAMPLES:
 
 ;; (::= $foo
 ;;      (@= 'foo (@... $bar ($$ "foo"))))
@@ -940,8 +959,7 @@
 
 
 
-
-
+;; execuate parser p on the input tokens
 (define $eval
   (lambda (p toks)
     (set! *parse-hash* (make-hasheq))
@@ -976,25 +994,28 @@
        [else (car r)]))))
 
 
-(define test-file1
-  (lambda (file)
-    (printf "testing file: ~a ... " file)
-    (let ([start (current-seconds)])
-      (flush-output)
-      (let ([res (test-string (read-file file))])
-        (cond
-         [(eq? #t res)
-          (printf "succeed.~ntime used: ~a seconds~n"
-                  (- (current-seconds) start))
-          (flush-output)]
-         [else
-          (printf "failed at token: ~a~n" res)
-          (flush-output)])))))
+
 
 
 (define test-file
   (lambda files
-    (for-each test-file1 files)))
+    (define test1
+      (lambda (file)
+        (printf "testing file: ~a ... " file)
+        (let ([start (current-seconds)])
+          (flush-output)
+          (let ([res (test-string (read-file file))])
+            (cond
+             [(eq? #t res)
+              (printf "succeed.~ntime used: ~a seconds~n"
+                      (- (current-seconds) start))
+              (flush-output)]
+             [else
+              (printf "failed at token: ~a~n" res)
+              (flush-output)])))))
+    (for-each test1 files)))
+
+
 
 
 
@@ -1011,14 +1032,13 @@
 (:: $non-parens
      (@and (@! $open) (@! $close)))
 
-(:: $parens
-     (@... $open (@* $sexp) $close))
+(::= $parens 'sexp
+     (@seq $open (@* $sexp) $close))
 
-(::= $sexp 'sexp
-    (@+ (@or $non-parens $parens)))
+(:: $sexp
+    (@+ (@or $parens $non-parens)))
 
-(::= $program 'program
-     $sexp)
+(:: $program $sexp)
 
 
 (define parse-sexp
@@ -1026,8 +1046,8 @@
     (first-val ($eval $program (scan s)))))
 
 
-;; (parse-sexp (read-file "paredit20.el"))
 ;; (parse-sexp "(lambda (x) x)")
+;; (parse-sexp (read-file "paredit20.el"))
 
 
 

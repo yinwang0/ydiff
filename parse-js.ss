@@ -78,6 +78,7 @@
 (:: $comment ($pred Comment?))
 
 
+;; delimeters
 (::  |,|   (@_ ","))
 (::  |;|   (@~ ";"))
 (::  |:|   (@_ ":"))
@@ -87,8 +88,6 @@
 (::  |]|   (@~ "]"))
 (::  |{|   (@~ "{"))
 (::  |}|   (@~ "}"))
-(::  |//|  ($glob (@* $comment)))
-(::  |//\n| (@or |//| |\n|))
 
 
 ;; $glob^ and $*^ needed to define |\n|, because the

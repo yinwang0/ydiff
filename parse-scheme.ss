@@ -31,6 +31,7 @@
 (define *comment-end* "")
 (define *operators*  '())
 (define *quotation-marks* '(#\"))
+(define *lisp-char* (list "#\\" "?\\"))
 (define *significant-whitespaces* '())
 
 
