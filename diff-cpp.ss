@@ -1,4 +1,4 @@
-;; yDiff - a language-aware tool for comparing programs
+;; ydiff - a language-aware tool for comparing programs
 ;; Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
 
 ;; This program is free software: you can redistribute it and/or modify
@@ -17,34 +17,17 @@
 
 
 
-(load "parse-cpp.ss")
-(load "diff.ss")
-
-
-;-------------------------------------------------------------
-;                       settings
-;-------------------------------------------------------------
-
-(define *move-ratio* 0)
-(define *move-size* 5)
-
-
-
 ;-------------------------------------------------------------
 ;                      overrides
 ;-------------------------------------------------------------
 
 (define get-name
   (lambda (node)
-    (let ([id-exp
-           (get-property
-            (get-property
-             (get-property node 'name)
-             'identifier)
-            'id)])
+    (let ([id-exp (match-tags node '(name identifier id))])
       (and id-exp (get-symbol (car (Expr-elts id-exp)))))))
 
-; (get-name (car (parse1 $statement "int f(int x) {}")))
+;; (get-name (car (parse1 $statement "int f(int x) {}")))
+
 
 ;; (same-def? (car (parse1 $statement "int f(int x) {}"))
 ;;            (car (parse1 $statement "int f(int x) {}")))
@@ -58,6 +41,8 @@
 ;---------------------------------------------
 (define diff-cpp
   (lambda (file1 file2)
+    (load "parse-cpp.ss")
+    (load "diff.ss")
     (diff file1 file2 parse-cpp)))
 
 

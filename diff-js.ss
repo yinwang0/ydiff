@@ -1,4 +1,4 @@
-;; yDiff - a language-aware tool for comparing programs
+;; ydiff - a language-aware tool for comparing programs
 ;; Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
 
 ;; This program is free software: you can redistribute it and/or modify
@@ -16,18 +16,6 @@
 
 
 
-(load "parse-js.ss")
-(load "diff.ss")
-
-
-;-------------------------------------------------------------
-;                         settings
-;-------------------------------------------------------------
-
-(define *move-ratio* 0)
-(define *move-size* 5)
-
-
 
 ;-------------------------------------------------------------
 ;                         overrides
@@ -35,12 +23,7 @@
 
 (define get-name
   (lambda (node)
-    (let ([id-exp
-           (get-property
-            (get-property
-             (get-property node 'name)
-             'identifier)
-            'id)])
+    (let ([id-exp (match-tags node '(name identifier id))])
       (and id-exp (get-symbol (car (Expr-elts id-exp)))))))
 
 
@@ -55,6 +38,8 @@
 ;---------------------------------------------
 (define diff-js
   (lambda (file1 file2)
+    (load "parse-js.ss")
+    (load "diff.ss")
     (diff file1 file2 parse-js)))
 
 ; (diff-js "tests/nav.js" "tests/nav-div.js")

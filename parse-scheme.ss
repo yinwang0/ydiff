@@ -1,4 +1,4 @@
-;; yDiff - a language-aware tool for comparing programs
+;; ydiff - a language-aware tool for comparing programs
 ;; Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
 
 ;; This program is free software: you can redistribute it and/or modify
@@ -25,9 +25,8 @@
 
 ; single quote is considered a delimeter in s-expression
 (define *delims* (list "("  ")"  "["  "]"  "{"  "}" "'"  "`"  "," ))
-
 (define *line-comment* (list ";"))
-(define *comment-start* "")             ; no block comments for lisp
+(define *comment-start* "")
 (define *comment-end* "")
 (define *operators*  '())
 (define *quotation-marks* '(#\"))

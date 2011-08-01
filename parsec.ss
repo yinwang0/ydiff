@@ -1,4 +1,4 @@
-;; yDiff - a language-aware tool for comparing programs
+;; ydiff - a language-aware tool for comparing programs
 ;; Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
 
 ;; This program is free software: you can redistribute it and/or modify
@@ -29,18 +29,21 @@
 
 ;; s-expression settings
 ;; please override for other languages.
-(define *delims* (list "("  ")"  "["  "]"  "{"  "}" "'"  "`"  "," ))
-(define *line-comment*  (list ";"))
-(define *comment-start*  "")
-(define *comment-end*    "")
+(define *delims* (list "("  ")"  "["  "]"  "{"  "}" "'"  "`"  ","))
+(define *line-comment* (list ";"))
+(define *comment-start* "")
+(define *comment-end* "")
 (define *operators*  '())
-(define *quotation-marks*  '(#\"))
-(define *lisp-char* '())
+(define *quotation-marks* '(#\"))
+(define *lisp-char* (list "#\\" "?\\"))
 (define *significant-whitespaces* '())
 
 
 
-;--------------------- data types ---------------------------
+
+;-------------------------------------------------------------
+;                       data types
+;-------------------------------------------------------------
 (struct Expr     (type elts start end)  #:transparent)
 (struct Token    (text start end)       #:transparent)
 (struct Char     (c start end)          #:transparent)
@@ -48,7 +51,6 @@
 (struct Str      (s start end)          #:transparent)
 (struct Newline  (start end)            #:transparent)
 (struct Phantom  (start end)            #:transparent)
-
 
 
 (define node-type
@@ -67,8 +69,7 @@
       [(Newline? node) (Newline-start node)]
       [(Phantom? node) (Phantom-start node)]
       [else
-       (fatal 'get-start
-              "unrecognized node: " node)])))
+       (fatal 'get-start "unrecognized node: " node)])))
 
 
 (define get-end
@@ -82,8 +83,7 @@
       [(Newline? node) (Newline-end node)]
       [(Phantom? node) (Phantom-end node)]
       [else
-       (fatal 'get-end
-              "unrecognized node: " node)])))
+       (fatal 'get-end "unrecognized node: " node)])))
 
 
 (define get-symbol
@@ -95,16 +95,24 @@
 
 
 (define get-property
-  (lambda (e type)
+  (lambda (e tag)
+    (let ([matches (filter (lambda (x) 
+                             (and (Expr? x)
+                                  (eq? (Expr-type x) tag)))
+                           (Expr-elts e))])
+      (cond
+       [(null? matches) #f]
+       [else (car matches)]))))
+
+
+(define match-tags
+  (lambda (e tags)
     (cond
      [(not (Expr? e)) #f]
+     [(null? tags) e]
      [else
-      (let ([matches (filter (lambda (x) (and (Expr? x)
-                                              (eq? (Expr-type x) type)))
-                             (Expr-elts e))])
-        (cond
-         [(null? matches) #f]
-         [else (car matches)]))])))
+      (match-tags (get-property e (car tags)) (cdr tags))])))
+
 
 
 
@@ -158,7 +166,6 @@
       ;;          [else #f]))]))
 ]
      [else #f])))
-
 
 
 
@@ -222,67 +229,67 @@
       (lambda (s start)
         (cond
          [(= start (string-length s)) (values 'eof start)]
-         [else
+
+         [(start-with-one-of s start *significant-whitespaces*)
+          (values (Newline start (add1 start)) (add1 start))]
+
+         [(whitespace? (string-ref s start))
+          (scan1 s (add1 start))]
+
+         [(start-with-one-of s start *line-comment*) ; line comment
+          (let ([line-end (find-next s start
+                                     (lambda (s start)
+                                       (eq? (string-ref s start) #\newline)))])
+            (values (Comment (substring s start line-end)
+                             start (add1 line-end))
+                    line-end))]
+
+         [(start-with s start *comment-start*) ; block comment
+          (let* ([line-end (find-next s start
+                                      (lambda (s start)
+                                        (start-with s start *comment-end*)))]
+                 [end (+ line-end (string-length *comment-end*))])
+            (values (Comment (substring s start end) start end) end))]
+
+         [(find-delim s start) =>
+          (lambda (delim)
+            (let ([end (+ start (string-length delim))])
+              (values (Token delim start end) end)))]
+
+         [(find-operator s start) =>
+          (lambda (op)
+            (let ([end (+ start (string-length op))])
+              (values (Token op start end) end)))]
+
+         [(start-with-one-of s start *quotation-marks*)   ; string
+          => (lambda (q) (scan-string s start q))]
+
+         [(start-with-one-of s start *lisp-char*) ; scheme/elisp char
           (cond
-           [(start-with-one-of s start *significant-whitespaces*)
-            (values (Newline start (add1 start)) (add1 start))]
+           [(<= (string-length s) (+ 2 start))
+            (error 'scan-string "reached EOF while scanning char")]
+           [else
+            (let ([end
+                   (let loop ([end (+ 3 start)])
+                     (cond
+                      [(or (whitespace? (string-ref s end))
+                           (delim? (string-ref s end)))
+                       end]
+                      [else (loop (add1 end))]))])
+              (values (Char (string-ref s (sub1 end)) start end) end))])]
 
-           [(whitespace? (string-ref s start))
-            (scan1 s (add1 start))]
-
-           [(start-with-one-of s start *line-comment*) ; line comment
-            (let ([line-end (find-next s start
-                                       (lambda (s start)
-                                         (eq? (string-ref s start) #\newline)))])
-              (values (Comment (substring s start line-end)
-                               start (add1 line-end))
-                      line-end))]
-
-           [(start-with s start *comment-start*) ; block comment
-            (let* ([line-end (find-next s start
-                                        (lambda (s start)
-                                          (start-with s start *comment-end*)))]
-                   [end (+ line-end (string-length *comment-end*))])
-              (values (Comment (substring s start end) start end) end))]
-
-           [(find-delim s start) =>
-            (lambda (delim)
-              (let ([end (+ start (string-length delim))])
-                (values (Token delim start end) end)))]
-
-           [(find-operator s start) =>
-            (lambda (op)
-              (let ([end (+ start (string-length op))])
-                (values (Token op start end) end)))]
-
-           [(start-with-one-of s start *quotation-marks*)   ; string
-            => (lambda (q) (scan-string s start q))]
-
-           [(start-with-one-of s start *lisp-char*) ; scheme/elisp char
+         [else                        ; identifier or number
+          (let loop ([pos start] [chars '()])
             (cond
-             [(<= (string-length s) (+ 2 start))
-              (error 'scan-string "reached EOF while scanning char")]
+             [(or (<= (string-length s) pos)
+                  (whitespace? (string-ref s pos))
+                  (find-delim s pos)
+                  (find-operator s pos))
+              (let ([text (list->string (reverse chars))])
+                (values (Token text start pos) pos))]
              [else
-              (let ([end
-                     (let loop ([end (+ 3 start)])
-                       (cond
-                        [(or (whitespace? (string-ref s end))
-                             (delim? (string-ref s end)))
-                         end]
-                        [else (loop (add1 end))]))])
-                (values (Char (string-ref s (sub1 end)) start end) end))])]
+              (loop (add1 pos) (cons (string-ref s pos) chars))]))])))
 
-           [else                        ; identifier or number
-            (let loop ([pos start] [chars '()])
-              (cond
-               [(or (<= (string-length s) pos)
-                    (whitespace? (string-ref s pos))
-                    (find-delim s pos)
-                    (find-operator s pos))
-                (let ([text (list->string (reverse chars))])
-                  (values (Token text start pos) pos))]
-               [else
-                (loop (add1 pos) (cons (string-ref s pos) chars))]))])])))
     (let loop ([start 0] [toks '()])
       (letv ([(tok newstart) (scan1 s start)])
         (cond

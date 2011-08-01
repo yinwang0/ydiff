@@ -1,4 +1,4 @@
-;; yDiff - a language-aware tool for comparing programs
+;; ydiff - a language-aware tool for comparing programs
 ;; Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
 
 ;; This program is free software: you can redistribute it and/or modify
@@ -15,17 +15,6 @@
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-
-(load "parse-scheme.ss")
-(load "diff.ss")
-
-
-;-------------------------------------------------------------
-;                         settings
-;-------------------------------------------------------------
-
-(define *move-ratio* 0)
-(define *move-size* 5)
 
 
 ;-------------------------------------------------------------
@@ -99,6 +88,8 @@
 ;-----------------------------------------
 (define diff-scheme
   (lambda (file1 file2)
+    (load "parse-scheme.ss")
+    (load "diff.ss")
     (diff file1 file2 parse-scheme)))
 
 

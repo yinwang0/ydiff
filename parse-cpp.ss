@@ -1,4 +1,4 @@
-;; yDiff - a language-aware tool for comparing programs
+;; ydiff - a language-aware tool for comparing programs
 ;; Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
 
 ;; This program is free software: you can redistribute it and/or modify
@@ -17,6 +17,12 @@
 
 (load "parsec.ss")
 
+
+
+;-------------------------------------------------------------
+;                     scanner settings
+;-------------------------------------------------------------
+
 (define *delims* (list "("  ")"  "["  "]"  "{"  "}" ","  "`"  ";" "#"))
 
 (define *operators*
@@ -30,7 +36,6 @@
    "^"  "|"  "&"  "~"
 ))
 
-;;---------------- parameters for the scanner ---------------
 (define *line-comment*  (list "//"))
 (define *comment-start*  "/*")
 (define *comment-end*    "*/")
