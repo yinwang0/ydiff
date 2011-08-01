@@ -48,7 +48,7 @@
 (struct Token    (text start end)       #:transparent)
 (struct Char     (c start end)          #:transparent)
 (struct Comment  (text start end)       #:transparent)
-(struct Str      (s start end)          #:transparent)
+(struct Str      (text start end)       #:transparent)
 (struct Newline  (start end)            #:transparent)
 (struct Phantom  (start end)            #:transparent)
 
@@ -314,9 +314,9 @@
           (let ([c (string-ref s next)])
             (cond
              [(eq? c quot)
-              (let ([str (list->string (reverse chars))]
+              (let ([text (list->string (reverse chars))]
                     [end (add1 next)])
-                (values (Str str start end) end))]
+                (values (Str text start end) end))]
              [(eq? c #\\)
               (cond
                [(<= (string-length s) (add1 next))
