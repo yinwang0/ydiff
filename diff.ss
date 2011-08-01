@@ -122,7 +122,7 @@
 (define deframe
   (lambda (node)
     (match node
-      [(Expr 'frame elts _ _)
+      [(Expr _ _ 'frame elts)
        (apply append (map deframe elts))]
      [else (list node)])))
 
@@ -142,16 +142,16 @@
 (define extract-frame
   (lambda (node1 node2 type)
     (match node1
-      [(Expr type1 elts1 start1 end1)
+      [(Expr start1 end1 type1 elts1)
        (let ([frame-elts (filter (lambda (x)
                                    (not (eq? x node2)))
                                  elts1)])
-         (type (Expr 'frame frame-elts start1 start1)))]
+         (type (Expr start1 start1 'frame frame-elts)))]
       [_ fatal 'extract-frame "I only accept Expr"])))
 
 
 ;; (define n1 (Token "ok" 0 1))
-;; (define n2 (Expr 'ok (list n1 (Token "bar" 1 2)) 0 2))
+;; (define n2 (Expr 'ok 0 2 (list n1 (Token "bar" 1 2))))
 ;; (map deframe-change (extract-frame n2 n1 ins))
 
 
@@ -162,11 +162,12 @@
 ;------------------ operations on nodes ---------------------
 
 ;; "virtual function" - get definition name
-;; should be overridden by different languages
+;; can be overridden by individual languages
 (define get-name (lambda (node) #f))
 
 
 ;; "virtual function" - get node type
+;; can be overridden by individual languages
 (define get-type
   (lambda (node)
     (cond
@@ -177,6 +178,8 @@
      [(Char? node) 'char])))
 
 
+;; same-def? and different-def? only depend on get-name, so they need
+;; not be overridden by individual languages.
 (define same-def?
   (lambda (e1 e2)
     (cond
@@ -387,8 +390,8 @@
       => (lambda (cached)
            (values (car cached) (cdr cached)))]
      [(and (Char? node1) (Char? node2))
-      (diff-string (char->string (Char-c node1))
-                   (char->string (Char-c node2))
+      (diff-string (char->string (Char-text node1))
+                   (char->string (Char-text node2))
                    node1 node2)]
      [(and (Str? node1) (Str? node2))
       (diff-string (Str-text node1) (Str-text node2) node1 node2)]

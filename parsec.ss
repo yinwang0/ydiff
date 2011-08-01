@@ -34,7 +34,7 @@
 (define *comment-start* "")
 (define *comment-end* "")
 (define *operators*  '())
-(define *quotation-marks* '(#\"))
+(define *quotation-marks* '(#\" #\'))
 (define *lisp-char* (list "#\\" "?\\"))
 (define *significant-whitespaces* '())
 
@@ -44,13 +44,14 @@
 ;-------------------------------------------------------------
 ;                       data types
 ;-------------------------------------------------------------
-(struct Expr     (type elts start end)  #:transparent)
-(struct Token    (text start end)       #:transparent)
-(struct Char     (c start end)          #:transparent)
-(struct Comment  (text start end)       #:transparent)
-(struct Str      (text start end)       #:transparent)
-(struct Newline  (start end)            #:transparent)
-(struct Phantom  (start end)            #:transparent)
+(struct Node    (start end)        #:transparent)
+(struct Expr     Node (type elts)  #:transparent)
+(struct Token    Node (text)       #:transparent)
+(struct Comment  Node (text)       #:transparent)
+(struct Str      Node (text)       #:transparent)
+(struct Char     Node (text)       #:transparent)
+(struct Newline  Node ()           #:transparent)
+(struct Phantom  Node ()           #:transparent)
 
 
 (define node-type
@@ -60,30 +61,12 @@
 
 (define get-start
   (lambda (node)
-    (cond
-      [(Expr? node)    (Expr-start node)]
-      [(Token? node)   (Token-start node)]
-      [(Char? node)    (Char-start node)]
-      [(Comment? node) (Comment-start node)]
-      [(Str? node)     (Str-start node)]
-      [(Newline? node) (Newline-start node)]
-      [(Phantom? node) (Phantom-start node)]
-      [else
-       (fatal 'get-start "unrecognized node: " node)])))
+    (Node-start node)))
 
 
 (define get-end
   (lambda (node)
-    (cond
-      [(Expr? node)    (Expr-end node)]
-      [(Token? node)   (Token-end node)]
-      [(Char? node)    (Char-end node)]
-      [(Comment? node) (Comment-end node)]
-      [(Str? node)     (Str-end node)]
-      [(Newline? node) (Newline-end node)]
-      [(Phantom? node) (Phantom-end node)]
-      [else
-       (fatal 'get-end "unrecognized node: " node)])))
+    (Node-end node)))
 
 
 (define get-symbol
@@ -94,9 +77,9 @@
      [else #f])))
 
 
-(define get-property
+(define get-tag
   (lambda (e tag)
-    (let ([matches (filter (lambda (x) 
+    (let ([matches (filter (lambda (x)
                              (and (Expr? x)
                                   (eq? (Expr-type x) tag)))
                            (Expr-elts e))])
@@ -111,7 +94,7 @@
      [(not (Expr? e)) #f]
      [(null? tags) e]
      [else
-      (match-tags (get-property e (car tags)) (cdr tags))])))
+      (match-tags (get-tag e (car tags)) (cdr tags))])))
 
 
 
@@ -193,7 +176,6 @@
      [else
       (start-with-one-of s start (cdr prefixes))])))
 
-
 ; (start-with-one-of "+>>=" 0 (list ">" #\+))
 
 
@@ -240,8 +222,7 @@
           (let ([line-end (find-next s start
                                      (lambda (s start)
                                        (eq? (string-ref s start) #\newline)))])
-            (values (Comment (substring s start line-end)
-                             start (add1 line-end))
+            (values (Comment start (add1 line-end) (substring s start line-end))
                     line-end))]
 
          [(start-with s start *comment-start*) ; block comment
@@ -249,20 +230,32 @@
                                       (lambda (s start)
                                         (start-with s start *comment-end*)))]
                  [end (+ line-end (string-length *comment-end*))])
-            (values (Comment (substring s start end) start end) end))]
+            (values (Comment start end (substring s start end)) end))]
 
          [(find-delim s start) =>
           (lambda (delim)
             (let ([end (+ start (string-length delim))])
-              (values (Token delim start end) end)))]
+              (values (Token start end delim) end)))]
 
          [(find-operator s start) =>
           (lambda (op)
             (let ([end (+ start (string-length op))])
-              (values (Token op start end) end)))]
+              (values (Token start end op) end)))]
 
          [(start-with-one-of s start *quotation-marks*)   ; string
-          => (lambda (q) (scan-string s start q))]
+          (let ([reg-match (or (regexp-match (regexp "^\"(\\\\.|[^\"])*\"")
+                                             s start)
+                               (regexp-match (regexp "^\'(\\\\.|[^\'])*\'")
+                                             s start))])
+            (cond
+             [(not reg-match)
+              (fatal 'scan "string match error")]
+             [else
+              (let* ([len (string-length (car reg-match))]
+                     [end (+ start len)])
+                (values (Str start end (car reg-match)) end))]))]
+
+         ;; => (lambda (q) (scan-string s start q))
 
          [(start-with-one-of s start *lisp-char*) ; scheme/elisp char
           (cond
@@ -276,7 +269,7 @@
                            (delim? (string-ref s end)))
                        end]
                       [else (loop (add1 end))]))])
-              (values (Char (string-ref s (sub1 end)) start end) end))])]
+              (values (Char start end (string-ref s (sub1 end))) end))])]
 
          [else                        ; identifier or number
           (let loop ([pos start] [chars '()])
@@ -286,7 +279,7 @@
                   (find-delim s pos)
                   (find-operator s pos))
               (let ([text (list->string (reverse chars))])
-                (values (Token text start pos) pos))]
+                (values (Token start pos text) pos))]
              [else
               (loop (add1 pos) (cons (string-ref s pos) chars))]))])))
 
@@ -298,34 +291,6 @@
          [else
           (loop newstart (cons tok toks))])))))
 
-
-
-(define scan-string
-  (lambda (s start quot)
-    (cond
-     [(not (eq? quot (string-ref s start)))
-      (error 'scan-string "string must start with quote")]
-     [else
-      (let loop ([next (add1 start)] [chars '()])
-        (cond
-         [(<= (string-length s) next)
-          (error 'scan-string "reached EOF while scanning string")]
-         [else
-          (let ([c (string-ref s next)])
-            (cond
-             [(eq? c quot)
-              (let ([text (list->string (reverse chars))]
-                    [end (add1 next)])
-                (values (Str text start end) end))]
-             [(eq? c #\\)
-              (cond
-               [(<= (string-length s) (add1 next))
-                (error 'scan-string "reached EOF while scanning string")]
-               [else
-                (loop (+ 2 next) (cons (string-ref s (add1 next))
-                                       (cons #\\ chars)))])]
-             [else
-              (loop (add1 next) (cons c chars))]))]))])))
 
 
 
@@ -455,15 +420,15 @@
              [(not type)
               (values (filter (negate Phantom?) t) r)]
              [(null? t)
-              (values (list (Expr type '()
+              (values (list (Expr (get-start (car toks))
                                   (get-start (car toks))
-                                  (get-start (car toks)) ))
+                                  type '()))
                       r)]
              [else
-              (values (list (Expr type
-                                  (filter (negate Phantom?) t)
-                                  (get-start (car t))
-                                  (get-end (last t))))
+              (values (list (Expr (get-start (car t))
+                                  (get-end (last t))
+                                  type
+                                  (filter (negate Phantom?) t)))
                       r)])))))))
 
 
@@ -709,9 +674,9 @@
          (cond
           [(null? fields) ret]
           [else
-           (let ([e (Expr type (list ret (car fields) (cadr fields))
-                          (get-start ret)
-                          (get-end (cadr fields)))])
+           (let ([e (Expr (get-start ret)
+                          (get-end (cadr fields))
+                          type (list ret (car fields) (cadr fields)))])
              (loop (cddr fields) e))]))))
 
 
@@ -723,9 +688,9 @@
            (cond
             [(null? fields) ret]
             [else
-             (let ([e (Expr type (list (cadr fields) (car fields) ret)
-                            (get-start (cadr fields))
-                            (get-end ret))])
+             (let ([e (Expr (get-start (cadr fields))
+                            (get-end ret)
+                            type (list (cadr fields) (car fields) ret))])
                (loop (cddr fields) e))])))))
 
 
@@ -807,10 +772,10 @@
          (cond
           [(null? ls) ret]
           [else
-           (let ([e (Expr type
-                          (list ret (car ls))
-                          (get-start ret)
-                          (get-end (car ls)))])
+           (let ([e (Expr (get-start ret)
+                          (get-end (car ls))
+                          type
+                          (list ret (car ls)))])
              (loop (cdr ls) e))]))))
 
 
@@ -832,10 +797,10 @@
      [(null? (cdr ls)) (car ls)]
      [else
       (let ([tail (make-prefix type (cdr ls))])
-        (Expr type
-              (list (car ls) tail)
-              (get-start (car ls))
-              (get-end tail)))])))
+        (Expr (get-start (car ls))
+              (get-end tail)
+              type
+              (list (car ls) tail)))])))
 
 
 ;; ($eval (@prefix 'prefix $primary-expression $prefix-operator)
