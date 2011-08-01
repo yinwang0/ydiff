@@ -191,7 +191,6 @@
      (@... ($$ "=") $assignment-expression))
 
 
-
 ;;--------------------------------------------
 (::= $with-statement 'with
      ($$ "with") (@= 'obj |(|  $expression  |)|)
@@ -206,9 +205,6 @@
 )))
 
 
-; ($eval $if-statement (scan "if (x<1) { return x; } else { return 0;}"))
-
-
 ;;--------------------------------------------
 (::= $do-while-statement 'do-while
      ($$ "do") $statement
@@ -217,16 +213,11 @@
 )
 
 
-; ($eval $do-while-statement (scan "do {x = x + 1 } while (x < 5);"))
-
-
-
 ;;--------------------------------------------
 (::= $while-statement 'while
      ($$ "while")  (@= 'test |(| $expression |)|   )
      $statement
 )
-
 
 
 ;;--------------------------------------------
@@ -265,14 +256,10 @@
 ))
 
 
-
 ;;--------------------------------------------
 (::= $continue-statement 'continue
     ($$ "continue") (@= 'label (@? $identifier)) |;\n|
 )
-
-; ($eval $continue-statement (scan "continue foo"))
-
 
 
 ;;--------------------------------------------
@@ -281,21 +268,16 @@
 )
 
 
-
 ;;--------------------------------------------
 (::= $return-statement 'return
     ($$ "return") (@= 'value (@? $expression)) |;\n|
 )
-
-; ($eval $return-statement (scan "return foo, bar+1"))
-
 
 
 ;;--------------------------------------------
 (::= $labelled-statement 'labelled-statement
      $identifier |:| $statement
 )
-
 
 
 ;;--------------------------------------------
@@ -316,7 +298,6 @@
 (::= $default-clause 'default
      ($$ "default") |:| (@* $statement)
 )
-
 
 
 ;;--------------------------------------------
@@ -403,14 +384,13 @@
 
 
 
-
 ;; 15.	?:	 Ternary conditional
 ;;--------------------------------------------
 (:: $conditional-expression
     (@or (@= 'conditional-expression
              (@= 'test $logical-or-expression)
-             ($$ "?") (@= 'then $conditional-expression)
-             ($$ ":") (@= 'else $conditional-expression))
+             (@~ "?") (@= 'then $conditional-expression)
+             (@~ ":") (@= 'else $conditional-expression))
 
          $logical-or-expression
          ))

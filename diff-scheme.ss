@@ -97,4 +97,5 @@
 ; (diff-scheme "tests/paredit20.el" "tests/paredit22.el")
 ; (diff-scheme "tests/mk.scm" "tests/mk-c.scm")
 ; (diff-scheme "tests/pass1.ss" "tests/pass2.ss")
+; (diff-scheme "parse-js.ss" "parse-cpp.ss")
 

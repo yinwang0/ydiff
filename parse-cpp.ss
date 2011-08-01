@@ -138,12 +138,10 @@
          $do-while-statement
          $while-statement
          $for-statement
-         $for-in-statement
          $continue-statement
          $break-statement
 
          $return-statement
-         $with-statement
          $labelled-statement
          $try-statement
 
@@ -331,23 +329,12 @@
 
 
 
-
-
-
-
 (::= $if-statement 'if
      ($$ "if")  (@= 'test |(| $expression |)|) $statement
      (@? (@= 'else ($$ "else") $statement))
 )
 
 
-; ($eval $if-statement (scan "if (x<1) { return x; } else { return 0;}"))
-
-
-
-;; doWhileStatement
-;; 	: 'do' LT!* statement LT!* 'while' LT!* '(' expression ')' (LT | ';')!
-;; 	;
 
 (::= $do-while-statement 'do-while
     ($$ "do") $statement
@@ -356,19 +343,10 @@
 )
 
 
-; ($eval $do-while-statement (scan "do {x = x + 1 } while (x < 5);"))
-
-
-
-;; whileStatement
-;; 	: 'while' LT!* '(' LT!* expression LT!* ')' LT!* statement
-;; 	;
-
 (::= $while-statement 'while
      ($$ "while")  (@= 'test |(| $expression |)|   )
      $statement
 )
-
 
 
 (::= $for-statement 'for
@@ -382,33 +360,12 @@
 )
 
 
-
-
 (::= $for-initaliser 'for-initializer
      (@or (@= 'variable-declaration
               $variable-declaration-list)
 
           $expression
 ))
-
-
-
-
-;; for JS
-(::= $for-in-statement 'for-in
-     ($$ "for") (@= 'iter
-                    |(|  (@? $for-in-initalizer) ($$ "in") $expression  |)|)
-     $statement
-)
-
-
-(::= $for-in-initalizer 'for-in-initializer
-     (@or (@= 'variable-declaration
-              ($$ "var") $variable-declaration-list)
-
-          $expression
-))
-
 
 
 (::= $continue-statement 'continue
@@ -425,11 +382,6 @@
      ($$ "return") (@= 'value (@? $expression)) |;|
 )
 
-
-(::= $with-statement 'with
-     ($$ "with") (@= 'obj |(|  $expression  |)|)
-     $statement
-)
 
 
 (::= $labelled-statement 'labelled-statement
@@ -498,14 +450,10 @@
 
 
 
-
 ;; 18. comma
 ;;--------------------------------------------
-(:: $comma-expression
-    (@or (@= 'comma
-             (@... $assignment-expression |,|
-                   (@.@ $assignment-expression |,|)))
-         $assignment-expression))
+(::= $comma-expression 'comma
+     (@.@ $assignment-expression |,|))
 
 
 
@@ -641,7 +589,6 @@
 
 
 
-
 ;; 8. relational
 ;;--------------------------------------------
 (:: $relational-expression
@@ -663,23 +610,22 @@
 
 
 
-
 ;; 7. bitwise shift
 ;;--------------------------------------------
 (:: $bitwise-shift-expression
     (@or (@infix-left 'binop
                       $additive-expression
-                      $shift-operator)
+                      $bitwise-shift-operator)
 
          $additive-expression
 ))
 
-(:: $shift-operator
+
+(:: $bitwise-shift-operator
     (@or (op "<<")
          (op ">>")
          (op ">>>")
          ))
-
 
 
 
@@ -925,4 +871,3 @@
 ;;            "tests/assembler-arm-7.cc"
 ;;            "tests/assembler-arm-8309.cc"
 ;; )
-
