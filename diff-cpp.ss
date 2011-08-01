@@ -16,6 +16,10 @@
 
 
 
+(load "parse-cpp.ss")
+(load "diff.ss")
+
+
 
 ;-------------------------------------------------------------
 ;                      overrides
@@ -41,8 +45,7 @@
 ;---------------------------------------------
 (define diff-cpp
   (lambda (file1 file2)
-    (load "parse-cpp.ss")
-    (load "diff.ss")
+    (load "diff-cpp.ss")
     (diff file1 file2 parse-cpp)))
 
 

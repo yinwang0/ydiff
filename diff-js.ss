@@ -16,6 +16,10 @@
 
 
 
+(load "parse-js.ss")
+(load "diff.ss")
+
+
 
 ;-------------------------------------------------------------
 ;                         overrides
@@ -38,8 +42,7 @@
 ;---------------------------------------------
 (define diff-js
   (lambda (file1 file2)
-    (load "parse-js.ss")
-    (load "diff.ss")
+    (load "diff-js.ss")
     (diff file1 file2 parse-js)))
 
 ; (diff-js "tests/nav.js" "tests/nav-div.js")

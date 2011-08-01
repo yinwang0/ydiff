@@ -16,6 +16,10 @@
 
 
 
+(load "parse-scheme.ss")
+(load "diff.ss")
+
+
 
 ;-------------------------------------------------------------
 ;                         overrides
@@ -88,8 +92,7 @@
 ;-----------------------------------------
 (define diff-scheme
   (lambda (file1 file2)
-    (load "parse-scheme.ss")
-    (load "diff.ss")
+    (load "diff-scheme.ss")
     (diff file1 file2 parse-scheme)))
 
 
