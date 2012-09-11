@@ -117,9 +117,8 @@ def parseFile(filename):
     f = open(filename, 'r');
     lines = f.read()
     ast = parse(lines)
-    improveAST(ast, lines, filename)
+    improveAST(ast, lines, filename, 'left')
     return ast
-
 
 
 
@@ -154,7 +153,10 @@ def src(node):
 
 
 def nodeStart(node):
-    return node.nodeStart
+    if (hasattr(node, 'nodeStart')):
+        return node.nodeStart
+    else:
+        return 0
 
 
 
@@ -1704,6 +1706,10 @@ def diff(file1, file2, move=True):
 
     cleanUp()
 
+    # base files names
+    baseName1 = pyFileName(file1)
+    baseName2 = pyFileName(file2)
+
     # get AST of file1
     f1 = open(file1, 'r');
     lines1 = f1.read()
@@ -1759,7 +1765,7 @@ def diff(file1, file2, move=True):
     leftChanges = filterlist(lambda p: p.orig <> None, changes)
     html1 = genHTML(lines1, leftChanges, 'left')
 
-    outname1 = file1 + '.html'
+    outname1 = baseName1 + '.html'
     outfile1 = open(outname1, 'w')
     outfile1.write(html1)
     outfile1.write('<div class="stats"><pre class="stats">')
@@ -1774,7 +1780,7 @@ def diff(file1, file2, move=True):
     rightChanges = filterlist(lambda p: p.cur <> None, changes)
     html2 = genHTML(lines2, rightChanges, 'right')
 
-    outname2 = file2 + '.html'
+    outname2 = baseName2 + '.html'
     outfile2 = open(outname2, 'w')
     outfile2.write(html2)
     outfile2.write('<div class="stats"><pre class="stats">')
@@ -1786,11 +1792,11 @@ def diff(file1, file2, move=True):
 
 
     # write frame file
-    framename = pyFileName(file1) + "-" + pyFileName(file2) + ".html"
+    framename = baseName1 + "-" + baseName2 + ".html"
     framefile = open(framename, 'w')
     framefile.write('<frameset cols="50%,50%">\n')
-    framefile.write('<frame name="left" src="' + file1 + '.html">\n')
-    framefile.write('<frame name="right" src="' + file2 + '.html">\n')
+    framefile.write('<frame name="left" src="' + baseName1 + '.html">\n')
+    framefile.write('<frame name="right" src="' + baseName2 + '.html">\n')
     framefile.write('</frameset>\n')
     framefile.close()
 
@@ -1844,7 +1850,7 @@ def checkpoint(init=None):
 #-------------------------------------------------------------
 
 ## text-based main command
-def ffid(file1, file2):
+def printDiff(file1, file2):
     (m, c) = diffFile(file1, file2)
     print "----------", file1, "<<<", c, ">>>", file2, "-----------"
 
@@ -1978,3 +1984,6 @@ def installPrinter():
             obj.__repr__ = printAst
 
 installPrinter()
+
+# demo
+# diff('demos/demo1.py', 'demos/demo2.py')
