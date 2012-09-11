@@ -1,0 +1,68 @@
+.deletion {
+    border: solid 1px #CC929A;
+    /* border: solid 1px #E6A4AE; */
+    background-color: LightPink;
+}
+
+.insertion {
+    border: solid 1px #73BE73;
+    /* border: solid 1px #82D682; */
+    background-color: LightGreen;
+}
+
+.change {
+    border: solid 1px #8AADB8;
+    /* border: solid 1px #9CC2CF; */
+    background-color: LightBlue;
+    cursor: pointer;
+}
+
+.move {
+    border: solid 1px LightPink;
+    /* border: solid 1px #BEBEBE; */
+    cursor: pointer;
+}
+
+.move-change {
+    border: solid 1px LightPink;
+    background-color: LightBlue;
+    /* border: solid 1px #BEBEBE; */
+    cursor: pointer;
+}
+
+.unchanged {
+    border: solid 1px #A9A9A9;
+    /* border: solid 1px #BEBEBE; */
+    cursor: pointer;
+}
+
+span.lineno {
+    color: lightgrey;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+span.keyword {
+    /* color: #007070; */
+    font-weight: 700;
+}
+
+div.line {
+}
+
+div.stats {
+    border: solid 1px grey;
+    z-index: 1000;
+    width: 80%;
+    padding-left: 5%;
+}
+
+pre.stats {
+    color: grey;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+pre {
+
+}

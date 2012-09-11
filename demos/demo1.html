@@ -1,0 +1,201 @@
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=utf-8">
+<LINK href="diff.css" rel="stylesheet" type="text/css">
+<script type="text/javascript" src="nav.js"></script>
+</head>
+<body>
+<pre>
+<div class="line" id="L1"><span class="lineno">1 </span>##################################################################</div>
+<div class="line" id="L2"><span class="lineno">2 </span># Demo for an AST-based diffing tool</div>
+<div class="line" id="L3"><span class="lineno">3 </span># author: Yin Wang (yinwang0@gmail.com)</div>
+<div class="line" id="L4"><span class="lineno">4 </span>##################################################################</div>
+<div class="line" id="L5"><span class="lineno">5 </span></div>
+<div class="line" id="L6"><span class="lineno">6 </span>##################################################################</div>
+<div class="line" id="L7"><span class="lineno">7 </span># Features:</div>
+<div class="line" id="L8"><span class="lineno">8 </span># - Detect insertion, deletion and modification of code</div>
+<div class="line" id="L9"><span class="lineno">9 </span># - Detect refactoring (renamed or moved code)</div>
+<div class="line" id="L10"><span class="lineno">10 </span># - Assess similarity of code</div>
+<div class="line" id="L11"><span class="lineno">11 </span># - Ignore comments and whitespaces</div>
+<div class="line" id="L12"><span class="lineno">12 </span>#</div>
+<div class="line" id="L13"><span class="lineno">13 </span>###################################################################</div>
+<div class="line" id="L14"><span class="lineno">14 </span># Usage:</div>
+<div class="line" id="L15"><span class="lineno">15 </span>#</div>
+<div class="line" id="L16"><span class="lineno">16 </span># - Mouseover any framed elements to show information</div>
+<div class="line" id="L17"><span class="lineno">17 </span>#</div>
+<div class="line" id="L18"><span class="lineno">18 </span># - Click on Blue or White elements to match the other side.</div>
+<div class="line" id="L19"><span class="lineno">19 </span>#   Once matched, the two sides will be locked into that</div>
+<div class="line" id="L20"><span class="lineno">20 </span>#   position until next match.</div>
+<div class="line" id="L21"><span class="lineno">21 </span>#</div>
+<div class="line" id="L22"><span class="lineno">22 </span>####################################################################</div>
+<div class="line" id="L23"><span class="lineno">23 </span># Legend of colors:</div>
+<div class="line" id="L24"><span class="lineno">24 </span>#</div>
+<div class="line" id="L25"><span class="lineno">25 </span># - Red   : deleted</div>
+<div class="line" id="L26"><span class="lineno">26 </span># - Green : inserted</div>
+<div class="line" id="L27"><span class="lineno">27 </span># - Blue  : modified (mouse over to show percentage of change)</div>
+<div class="line" id="L28"><span class="lineno">28 </span># - White : unchanged or moved</div>
+<div class="line" id="L29"><span class="lineno">29 </span>#</div>
+<div class="line" id="L30"><span class="lineno">30 </span>###################################################################</div>
+<div class="line" id="L31"><span class="lineno">31 </span></div>
+<div class="line" id="L32"><span class="lineno">32 </span></div>
+<div class="line" id="L33"><span class="lineno">33 </span></div>
+<div class="line" id="L34"><span class="lineno">34 </span></div>
+<div class="line" id="L35"><span class="lineno">35 </span><a id="60"  class="change"  title="class &#39;Nil&#39; (line 35) changed to class &#39;Nil&#39; (line 49) (similarity 63.8%)" onclick="highlight('60','61','L35','L49')"><span class="keyword">class</a></span> <a id="58"  class="move"  title="&#39;Nil&#39; (line 35) moved to &#39;Nil&#39; (line 49) (unchanged)" onclick="highlight('58','59','L35','L49')">Nil</a>:</div>
+<div class="line" id="L36"><span class="lineno">36 </span>    <a id="56"  class="change"  title="function &#39;__repr__&#39; (line 36) changed to function &#39;__repr__&#39; (line 50) (similarity 89.3%)" onclick="highlight('56','57','L36','L50')"><span class="keyword">def</a></span> <a id="54"  class="move"  title="&#39;__repr__&#39; (line 36) moved to &#39;__repr__&#39; (line 50) (unchanged)" onclick="highlight('54','55','L36','L50')">__repr__</a>(<a id="50"  class="change"  title="&#39;this&#39; (line 36) renamed to &#39;self&#39; (line 50) (similarity 25.0%)" onclick="highlight('50','51','L36','L50')">this</a>):</div>
+<div class="line" id="L37"><span class="lineno">37 </span>        <span class="keyword">return</span> <a id="52"  class="move"  title="string &#39;()&#39; (line 37) moved to string &#39;()&#39; (line 51) (unchanged)" onclick="highlight('52','53','L37','L51')">&quot;()&quot;</a></div>
+<div class="line" id="L38"><span class="lineno">38 </span></div>
+<div class="line" id="L39"><span class="lineno">39 </span><a id="62"  class="move"  title="&#39;nil&#39; (line 39) moved to &#39;nil&#39; (line 55) (unchanged)" onclick="highlight('62','63','L39','L55')">nil</a> = <a id="64"  class="move"  title="&#39;Nil&#39; (line 39) moved to &#39;Nil&#39; (line 55) (unchanged)" onclick="highlight('64','65','L39','L55')">Nil</a>()            # singleton instance of Nil</div>
+<div class="line" id="L40"><span class="lineno">40 </span></div>
+<div class="line" id="L41"><span class="lineno">41 </span></div>
+<div class="line" id="L42"><span class="lineno">42 </span></div>
+<div class="line" id="L43"><span class="lineno">43 </span><a id="168"  class="change"  title="class &#39;Cons&#39; (line 43) renamed to class &#39;Pair&#39; (line 60) (similarity 85.7%)" onclick="highlight('168','169','L43','L60')"><span class="keyword">class</a></span> <a id="166"  class="change"  title="&#39;Cons&#39; (line 43) renamed to &#39;Pair&#39; (line 60) (similarity 0.0%)" onclick="highlight('166','167','L43','L60')">Cons</a>:</div>
+<div class="line" id="L44"><span class="lineno">44 </span>    <a id="82"  class="change"  title="function &#39;__init__&#39; (line 44) changed to function &#39;__init__&#39; (line 61) (similarity 77.8%)" onclick="highlight('82','83','L44','L61')"><span class="keyword">def</a></span> <a id="80"  class="move"  title="&#39;__init__&#39; (line 44) moved to &#39;__init__&#39; (line 61) (unchanged)" onclick="highlight('80','81','L44','L61')">__init__</a>(<a id="70"  class="change"  title="&#39;this&#39; (line 44) renamed to &#39;self&#39; (line 61) (similarity 25.0%)" onclick="highlight('70','71','L44','L61')">this</a>, <a id="68"  class="change"  title="&#39;first&#39; (line 44) renamed to &#39;fst&#39; (line 61) (similarity 75.0%)" onclick="highlight('68','69','L44','L61')">first</a>, <a id="66"  class="change"  title="&#39;rest&#39; (line 44) renamed to &#39;snd&#39; (line 61) (similarity 28.6%)" onclick="highlight('66','67','L44','L61')">rest</a>):</div>
+<div class="line" id="L45"><span class="lineno">45 </span>            <a id="72"  class="change"  title="&#39;&#39;this&#39;.&#39;first&#39;&#39; (line 45) changed to &#39;&#39;self&#39;.&#39;fst&#39;&#39; (line 62) (similarity 85.2%)" onclick="highlight('72','73','L45','L62')">this.first</a> = <a id="74"  class="change"  title="&#39;first&#39; (line 45) renamed to &#39;fst&#39; (line 62) (similarity 75.0%)" onclick="highlight('74','75','L45','L62')">first</a></div>
+<div class="line" id="L46"><span class="lineno">46 </span>            <a id="76"  class="change"  title="&#39;&#39;this&#39;.&#39;rest&#39;&#39; (line 46) changed to &#39;&#39;self&#39;.&#39;snd&#39;&#39; (line 63) (similarity 78.4%)" onclick="highlight('76','77','L46','L63')">this.rest</a> = <a id="78"  class="change"  title="&#39;rest&#39; (line 46) renamed to &#39;snd&#39; (line 63) (similarity 28.6%)" onclick="highlight('78','79','L46','L63')">rest</a></div>
+<div class="line" id="L47"><span class="lineno">47 </span>    <a id="164"  class="change"  title="function &#39;__repr__&#39; (line 47) changed to function &#39;__repr__&#39; (line 64) (similarity 93.0%)" onclick="highlight('164','165','L47','L64')"><span class="keyword">def</a></span> <a id="162"  class="move"  title="&#39;__repr__&#39; (line 47) moved to &#39;__repr__&#39; (line 64) (unchanged)" onclick="highlight('162','163','L47','L64')">__repr__</a>(<a id="84"  class="change"  title="&#39;this&#39; (line 47) renamed to &#39;self&#39; (line 64) (similarity 25.0%)" onclick="highlight('84','85','L47','L64')">this</a>):</div>
+<div class="line" id="L48"><span class="lineno">48 </span>        <span class="keyword">if</span> (<a id="90"  class="change"  title="&#39;&#39;this&#39;.&#39;rest&#39;&#39; (line 48) changed to &#39;&#39;self&#39;.&#39;snd&#39;&#39; (line 65) (similarity 78.4%)" onclick="highlight('90','91','L48','L65')">this.rest</a> <a id="86"  class="move"  title="&#39;==&#39; (line 48) moved to &#39;==&#39; (line 65) (unchanged)" onclick="highlight('86','87','L48','L65')">==</a> <a id="88"  class="move"  title="&#39;nil&#39; (line 48) moved to &#39;nil&#39; (line 65) (unchanged)" onclick="highlight('88','89','L48','L65')">nil</a>):</div>
+<div class="line" id="L49"><span class="lineno">49 </span>            <span class="keyword">return</span> <a id="96"  class="move"  title="string &#39;(&#39; (line 49) moved to string &#39;(&#39; (line 66) (unchanged)" onclick="highlight('96','97','L49','L66')">&quot;(&quot;</a> <a id="102"  class="move"  title="&#39;+&#39; (line 49) moved to &#39;+&#39; (line 66) (unchanged)" onclick="highlight('102','103','L49','L66')">+</a> <a id="100"  class="move"  title="&#39;repr&#39; (line 49) moved to &#39;repr&#39; (line 66) (unchanged)" onclick="highlight('100','101','L49','L66')">repr</a>(<a id="98"  class="change"  title="&#39;&#39;this&#39;.&#39;first&#39;&#39; (line 49) changed to &#39;&#39;self&#39;.&#39;fst&#39;&#39; (line 66) (similarity 85.2%)" onclick="highlight('98','99','L49','L66')">this.first</a>) <a id="92"  class="move"  title="&#39;+&#39; (line 49) moved to &#39;+&#39; (line 66) (unchanged)" onclick="highlight('92','93','L49','L66')">+</a> <a id="94"  class="move"  title="string &#39;)&#39; (line 49) moved to string &#39;)&#39; (line 66) (unchanged)" onclick="highlight('94','95','L49','L66')">&quot;)&quot;</a></div>
+<div class="line" id="L50"><span class="lineno">50 </span>        elif (<a id="108"  class="change"  title="&#39;IS&#39; (line 50) renamed to &#39;isinstance&#39; (line 67) (similarity 16.7%)" onclick="highlight('108','109','L50','L67')">IS</a>(<a id="106"  class="change"  title="&#39;&#39;this&#39;.&#39;rest&#39;&#39; (line 50) changed to &#39;&#39;self&#39;.&#39;snd&#39;&#39; (line 67) (similarity 78.4%)" onclick="highlight('106','107','L50','L67')">this.rest</a>, <a id="104"  class="change"  title="&#39;Cons&#39; (line 50) renamed to &#39;Pair&#39; (line 67) (similarity 0.0%)" onclick="highlight('104','105','L50','L67')">Cons</a>)):</div>
+<div class="line" id="L51"><span class="lineno">51 </span>            <a id="110"  class="move"  title="&#39;s&#39; (line 51) moved to &#39;s&#39; (line 68) (unchanged)" onclick="highlight('110','111','L51','L68')">s</a> = <a id="114"  class="move"  title="&#39;repr&#39; (line 51) moved to &#39;repr&#39; (line 68) (unchanged)" onclick="highlight('114','115','L51','L68')">repr</a>(<a id="112"  class="change"  title="&#39;&#39;this&#39;.&#39;rest&#39;&#39; (line 51) changed to &#39;&#39;self&#39;.&#39;snd&#39;&#39; (line 68) (similarity 78.4%)" onclick="highlight('112','113','L51','L68')">this.rest</a>)</div>
+<div class="line" id="L52"><span class="lineno">52 </span>            <span class="keyword">return</span> <a id="124"  class="move"  title="string &#39;(&#39; (line 52) moved to string &#39;(&#39; (line 69) (unchanged)" onclick="highlight('124','125','L52','L69')">&quot;(&quot;</a> <a id="130"  class="move"  title="&#39;+&#39; (line 52) moved to &#39;+&#39; (line 69) (unchanged)" onclick="highlight('130','131','L52','L69')">+</a> <a id="128"  class="move"  title="&#39;repr&#39; (line 52) moved to &#39;repr&#39; (line 69) (unchanged)" onclick="highlight('128','129','L52','L69')">repr</a>(<a id="126"  class="change"  title="&#39;&#39;this&#39;.&#39;first&#39;&#39; (line 52) changed to &#39;&#39;self&#39;.&#39;fst&#39;&#39; (line 69) (similarity 85.2%)" onclick="highlight('126','127','L52','L69')">this.first</a>) <a id="120"  class="move"  title="&#39;+&#39; (line 52) moved to &#39;+&#39; (line 69) (unchanged)" onclick="highlight('120','121','L52','L69')">+</a> <a id="122"  class="move"  title="string &#39; &#39; (line 52) moved to string &#39; &#39; (line 69) (unchanged)" onclick="highlight('122','123','L52','L69')">&quot; &quot;</a> <a id="138"  class="move"  title="&#39;+&#39; (line 52) moved to &#39;+&#39; (line 69) (unchanged)" onclick="highlight('138','139','L52','L69')">+</a> <a id="136"  class="move"  title="&#39;s&#39; (line 52) moved to &#39;s&#39; (line 69) (unchanged)" onclick="highlight('136','137','L52','L69')">s</a>[<a id="132"  class="move"  title="1 (line 52) moved to 1 (line 69) (unchanged)" onclick="highlight('132','133','L52','L69')">1</a>:-<a id="134"  class="move"  title="-1 (line 52) moved to -1 (line 69) (unchanged)" onclick="highlight('134','135','L52','L69')">1]</a> <a id="116"  class="move"  title="&#39;+&#39; (line 52) moved to &#39;+&#39; (line 69) (unchanged)" onclick="highlight('116','117','L52','L69')">+</a> <a id="118"  class="move"  title="string &#39;)&#39; (line 52) moved to string &#39;)&#39; (line 69) (unchanged)" onclick="highlight('118','119','L52','L69')">&quot;)&quot;</a></div>
+<div class="line" id="L53"><span class="lineno">53 </span>        else:</div>
+<div class="line" id="L54"><span class="lineno">54 </span>            <span class="keyword">return</span> <a id="148"  class="move"  title="string &#39;(&#39; (line 54) moved to string &#39;(&#39; (line 71) (unchanged)" onclick="highlight('148','149','L54','L71')">&quot;(&quot;</a> <a id="154"  class="move"  title="&#39;+&#39; (line 54) moved to &#39;+&#39; (line 71) (unchanged)" onclick="highlight('154','155','L54','L71')">+</a> <a id="152"  class="move"  title="&#39;repr&#39; (line 54) moved to &#39;repr&#39; (line 71) (unchanged)" onclick="highlight('152','153','L54','L71')">repr</a>(<a id="150"  class="change"  title="&#39;&#39;this&#39;.&#39;first&#39;&#39; (line 54) changed to &#39;&#39;self&#39;.&#39;fst&#39;&#39; (line 71) (similarity 85.2%)" onclick="highlight('150','151','L54','L71')">this.first</a>) <a id="144"  class="move"  title="&#39;+&#39; (line 54) moved to &#39;+&#39; (line 71) (unchanged)" onclick="highlight('144','145','L54','L71')">+</a> <a id="146"  class="move"  title="string &#39; . &#39; (line 54) moved to string &#39; . &#39; (line 71) (unchanged)" onclick="highlight('146','147','L54','L71')">&quot; . &quot;</a> <a id="160"  class="move"  title="&#39;+&#39; (line 54) moved to &#39;+&#39; (line 71) (unchanged)" onclick="highlight('160','161','L54','L71')">+</a> <a id="158"  class="move"  title="&#39;repr&#39; (line 54) moved to &#39;repr&#39; (line 71) (unchanged)" onclick="highlight('158','159','L54','L71')">repr</a>(<a id="156"  class="change"  title="&#39;&#39;this&#39;.&#39;rest&#39;&#39; (line 54) changed to &#39;&#39;self&#39;.&#39;snd&#39;&#39; (line 71) (similarity 78.4%)" onclick="highlight('156','157','L54','L71')">this.rest</a>) <a id="140"  class="move"  title="&#39;+&#39; (line 54) moved to &#39;+&#39; (line 71) (unchanged)" onclick="highlight('140','141','L54','L71')">+</a> <a id="142"  class="move"  title="string &#39;)&#39; (line 54) moved to string &#39;)&#39; (line 71) (unchanged)" onclick="highlight('142','143','L54','L71')">&quot;)&quot;</a></div>
+<div class="line" id="L55"><span class="lineno">55 </span></div>
+<div class="line" id="L56"><span class="lineno">56 </span></div>
+<div class="line" id="L57"><span class="lineno">57 </span></div>
+<div class="line" id="L58"><span class="lineno">58 </span></div>
+<div class="line" id="L59"><span class="lineno">59 </span><a id="178"  class="change"  title="function &#39;foldl&#39; (line 59) changed to function &#39;foldl&#39; (line 78) (similarity 32.7%)" onclick="highlight('178','179','L59','L78')"><span class="keyword">def</a></span> <a id="176"  class="move"  title="&#39;foldl&#39; (line 59) moved to &#39;foldl&#39; (line 78) (unchanged)" onclick="highlight('176','177','L59','L78')">foldl</a>(<a id="174"  class="move"  title="&#39;f&#39; (line 59) moved to &#39;f&#39; (line 78) (unchanged)" onclick="highlight('174','175','L59','L78')">f</a>, <a id="172"  class="move"  title="&#39;x&#39; (line 59) moved to &#39;x&#39; (line 78) (unchanged)" onclick="highlight('172','173','L59','L78')">x</a>, <a id="170"  class="move"  title="&#39;ls&#39; (line 59) moved to &#39;ls&#39; (line 78) (unchanged)" onclick="highlight('170','171','L59','L78')">ls</a>):</div>
+<div class="line" id="L60"><span class="lineno">60 </span>    <span class="deletion" title="if statement (line 60) deleted"><span class="keyword">if</span> ls == nil:</div>
+<div class="line" id="L61"><span class="lineno">61 </span>        <span class="keyword">return</span> x</div>
+<div class="line" id="L62"><span class="lineno">62 </span>    else:</div>
+<div class="line" id="L63"><span class="lineno">63 </span>        <span class="keyword">return</span> <span class="deletion" title="call to &#39;&#39;foldl&#39;&#39; (line 63) deleted">foldl(f, f(x, ls.first), ls.rest)</span></span></div>
+<div class="line" id="L64"><span class="lineno">64 </span></div>
+<div class="line" id="L65"><span class="lineno">65 </span></div>
+<div class="line" id="L66"><span class="lineno">66 </span></div>
+<div class="line" id="L67"><span class="lineno">67 </span></div>
+<div class="line" id="L68"><span class="lineno">68 </span><a id="184"  class="change"  title="function &#39;length&#39; (line 68) changed to function &#39;length&#39; (line 87) (similarity 27.9%)" onclick="highlight('184','185','L68','L87')"><span class="keyword">def</a></span> <a id="182"  class="move"  title="&#39;length&#39; (line 68) moved to &#39;length&#39; (line 87) (unchanged)" onclick="highlight('182','183','L68','L87')">length</a>(<a id="180"  class="move"  title="&#39;ls&#39; (line 68) moved to &#39;ls&#39; (line 87) (unchanged)" onclick="highlight('180','181','L68','L87')">ls</a>):</div>
+<div class="line" id="L69"><span class="lineno">69 </span>    <span class="deletion" title="if statement (line 69) deleted"><span class="keyword">if</span> ls == nil:</div>
+<div class="line" id="L70"><span class="lineno">70 </span>        <span class="keyword">return</span> 0</div>
+<div class="line" id="L71"><span class="lineno">71 </span>    else:</div>
+<div class="line" id="L72"><span class="lineno">72 </span>        <span class="keyword">return</span> <span class="deletion" title="1 + call to &#39;&#39;length&#39;&#39; (line 72) deleted">1 + length(ls.rest)</span></span></div>
+<div class="line" id="L73"><span class="lineno">73 </span></div>
+<div class="line" id="L74"><span class="lineno">74 </span></div>
+<div class="line" id="L75"><span class="lineno">75 </span></div>
+<div class="line" id="L76"><span class="lineno">76 </span></div>
+<div class="line" id="L77"><span class="lineno">77 </span><span class="deletion" title="function &#39;atomAssoc&#39; (line 77) deleted"><span class="keyword">def</span></span> atomAssoc(u, v):</div>
+<div class="line" id="L78"><span class="lineno">78 </span>    <span class="keyword">return</span> Cons(Cons(u, v), nil)</div>
+<div class="line" id="L79"><span class="lineno">79 </span></div>
+<div class="line" id="L80"><span class="lineno">80 </span></div>
+<div class="line" id="L81"><span class="lineno">81 </span></div>
+<div class="line" id="L82"><span class="lineno">82 </span></div>
+<div class="line" id="L83"><span class="lineno">83 </span><span class="deletion" title="function &#39;mkList&#39; (line 83) deleted"><span class="keyword">def</span></span> mkList(pylist):</div>
+<div class="line" id="L84"><span class="lineno">84 </span>    <span class="keyword">if</span> (pylist == []):</div>
+<div class="line" id="L85"><span class="lineno">85 </span>        <span class="keyword">return</span> nil</div>
+<div class="line" id="L86"><span class="lineno">86 </span>    else:</div>
+<div class="line" id="L87"><span class="lineno">87 </span>        <span class="keyword">return</span> Cons(pylist[0], mkList(pylist[1:]))</div>
+<div class="line" id="L88"><span class="lineno">88 </span></div>
+<div class="line" id="L89"><span class="lineno">89 </span></div>
+<div class="line" id="L90"><span class="lineno">90 </span></div>
+<div class="line" id="L91"><span class="lineno">91 </span></div>
+<div class="line" id="L92"><span class="lineno">92 </span><span class="deletion" title="function &#39;toList&#39; (line 92) deleted"><span class="keyword">def</span></span> toList(ls):</div>
+<div class="line" id="L93"><span class="lineno">93 </span>    ret = []</div>
+<div class="line" id="L94"><span class="lineno">94 </span>    <span class="keyword">while</span> ls &lt;&gt; nil:</div>
+<div class="line" id="L95"><span class="lineno">95 </span>        ret.append(ls.first)</div>
+<div class="line" id="L96"><span class="lineno">96 </span>        ls = ls.rest</div>
+<div class="line" id="L97"><span class="lineno">97 </span>    <span class="keyword">return</span> ret</div>
+<div class="line" id="L98"><span class="lineno">98 </span></div>
+<div class="line" id="L99"><span class="lineno">99 </span></div>
+<div class="line" id="L100"><span class="lineno">100 </span></div>
+<div class="line" id="L101"><span class="lineno">101 </span></div>
+<div class="line" id="L102"><span class="lineno">102 </span><a id="18"  class="change"  title="function &#39;ext&#39; (line 102) changed to function &#39;ext&#39; (line 192) (similarity 86.7%)" onclick="highlight('18','19','L102','L192')"><span class="keyword">def</a></span> <a id="0"  class="move"  title="&#39;ext&#39; (line 102) moved to &#39;ext&#39; (line 192) (unchanged)" onclick="highlight('0','1','L102','L192')">ext</a>(<a id="12"  class="move"  title="&#39;x&#39; (line 102) moved to &#39;x&#39; (line 192) (unchanged)" onclick="highlight('12','13','L102','L192')">x</a>, <a id="14"  class="move"  title="&#39;v&#39; (line 102) moved to &#39;v&#39; (line 192) (unchanged)" onclick="highlight('14','15','L102','L192')">v</a>, <a id="16"  class="move"  title="&#39;s&#39; (line 102) moved to &#39;s&#39; (line 192) (unchanged)" onclick="highlight('16','17','L102','L192')">s</a>):</div>
+<div class="line" id="L103"><span class="lineno">103 </span>    <span class="keyword">return</span> <a id="2"  class="change"  title="&#39;Cons&#39; (line 103) renamed to &#39;Pair&#39; (line 193) (similarity 0.0%)" onclick="highlight('2','3','L103','L193')">Cons</a>(<a id="4"  class="change"  title="&#39;Cons&#39; (line 103) renamed to &#39;Pair&#39; (line 193) (similarity 0.0%)" onclick="highlight('4','5','L103','L193')">Cons</a>(<a id="6"  class="move"  title="&#39;x&#39; (line 103) moved to &#39;x&#39; (line 193) (unchanged)" onclick="highlight('6','7','L103','L193')">x</a>, <a id="8"  class="move"  title="&#39;v&#39; (line 103) moved to &#39;v&#39; (line 193) (unchanged)" onclick="highlight('8','9','L103','L193')">v</a>), <a id="10"  class="move"  title="&#39;s&#39; (line 103) moved to &#39;s&#39; (line 193) (unchanged)" onclick="highlight('10','11','L103','L193')">s</a>)</div>
+<div class="line" id="L104"><span class="lineno">104 </span></div>
+<div class="line" id="L105"><span class="lineno">105 </span></div>
+<div class="line" id="L106"><span class="lineno">106 </span></div>
+<div class="line" id="L107"><span class="lineno">107 </span></div>
+<div class="line" id="L108"><span class="lineno">108 </span><a id="196"  class="change"  title="function &#39;append&#39; (line 108) changed to function &#39;append&#39; (line 160) (similarity 32.8%)" onclick="highlight('196','197','L108','L160')"><span class="keyword">def</a></span> <a id="194"  class="move"  title="&#39;append&#39; (line 108) moved to &#39;append&#39; (line 160) (unchanged)" onclick="highlight('194','195','L108','L160')">append</a>(<span class="deletion" title="&#39;ls1&#39; (line 108) deleted">ls1</span>, <span class="deletion" title="&#39;ls2&#39; (line 108) deleted">ls2</span>):</div>
+<div class="line" id="L109"><span class="lineno">109 </span>    <span class="deletion" title="if statement (line 109) deleted"><span class="keyword">if</span> (ls1 == nil):</div>
+<div class="line" id="L110"><span class="lineno">110 </span>        <span class="keyword">return</span> ls2</div>
+<div class="line" id="L111"><span class="lineno">111 </span>    else:</div>
+<div class="line" id="L112"><span class="lineno">112 </span>        <span class="keyword">return</span> <a id="192"  class="change"  title="&#39;append&#39; (line 112) renamed to &#39;foldl&#39; (line 166) (similarity 18.2%)" onclick="highlight('192','193','L112','L166')">append</a>(<a id="190"  class="change"  title="&#39;&#39;ls1&#39;.&#39;rest&#39;&#39; (line 112) renamed to &#39;nil&#39; (line 166) (similarity 59.1%)" onclick="highlight('190','191','L112','L166')">ls1.rest</a>, <a id="188"  class="change"  title="&#39;Cons&#39; (line 112) renamed to &#39;slist&#39; (line 166) (similarity 22.2%)" onclick="highlight('188','189','L112','L166')">Cons</a>(<a id="186"  class="change"  title="&#39;&#39;ls1&#39;.&#39;first&#39;&#39; (line 112) renamed to &#39;lists&#39; (line 166) (similarity 78.6%)" onclick="highlight('186','187','L112','L166')">ls1.first</a>, <span class="deletion" title="&#39;ls2&#39; (line 112) deleted">ls2</span>))</span></div>
+<div class="line" id="L113"><span class="lineno">113 </span></div>
+<div class="line" id="L114"><span class="lineno">114 </span></div>
+<div class="line" id="L115"><span class="lineno">115 </span></div>
+<div class="line" id="L116"><span class="lineno">116 </span></div>
+<div class="line" id="L117"><span class="lineno">117 </span><a id="206"  class="change"  title="function &#39;assq&#39; (line 117) changed to function &#39;assq&#39; (line 171) (similarity 29.6%)" onclick="highlight('206','207','L117','L171')"><span class="keyword">def</a></span> <a id="204"  class="move"  title="&#39;assq&#39; (line 117) moved to &#39;assq&#39; (line 171) (unchanged)" onclick="highlight('204','205','L117','L171')">assq</a>(<a id="200"  class="move"  title="&#39;x&#39; (line 117) moved to &#39;x&#39; (line 171) (unchanged)" onclick="highlight('200','201','L117','L171')">x</a>, <a id="198"  class="move"  title="&#39;s&#39; (line 117) moved to &#39;s&#39; (line 171) (unchanged)" onclick="highlight('198','199','L117','L171')">s</a>):</div>
+<div class="line" id="L118"><span class="lineno">118 </span>    <span class="deletion" title="while loop (line 118) deleted"><span class="keyword">while</span> s &lt;&gt; nil:</div>
+<div class="line" id="L119"><span class="lineno">119 </span>        <span class="keyword">if</span> x == s.first.first:</div>
+<div class="line" id="L120"><span class="lineno">120 </span>            <span class="keyword">return</span> s.first</div>
+<div class="line" id="L121"><span class="lineno">121 </span>        else:</div>
+<div class="line" id="L122"><span class="lineno">122 </span>            s = s.rest</span></div>
+<div class="line" id="L123"><span class="lineno">123 </span>    <span class="keyword">return</span> <a id="202"  class="move"  title="&#39;None&#39; (line 123) moved to &#39;None&#39; (line 175) (unchanged)" onclick="highlight('202','203','L123','L175')">None</a></div>
+<div class="line" id="L124"><span class="lineno">124 </span></div>
+<div class="line" id="L125"><span class="lineno">125 </span>    # if (s == nil):</div>
+<div class="line" id="L126"><span class="lineno">126 </span>    #     return None</div>
+<div class="line" id="L127"><span class="lineno">127 </span>    # elif (x == s.first.first):</div>
+<div class="line" id="L128"><span class="lineno">128 </span>    #     return s.first</div>
+<div class="line" id="L129"><span class="lineno">129 </span>    # else:</div>
+<div class="line" id="L130"><span class="lineno">130 </span>    #     return assq(x, s.rest)</div>
+<div class="line" id="L131"><span class="lineno">131 </span></div>
+<div class="line" id="L132"><span class="lineno">132 </span></div>
+<div class="line" id="L133"><span class="lineno">133 </span># lookup is unchanged, but it is moved in relative</div>
+<div class="line" id="L134"><span class="lineno">134 </span># position to other functions.</div>
+<div class="line" id="L135"><span class="lineno">135 </span><a id="232"  class="move"  title="function &#39;lookup&#39; (line 135) moved to function &#39;lookup&#39; (line 198) (unchanged)" onclick="highlight('232','233','L135','L198')"><span class="keyword">def</a></span> <a id="230"  class="move"  title="&#39;lookup&#39; (line 135) moved to &#39;lookup&#39; (line 198) (unchanged)" onclick="highlight('230','231','L135','L198')">lookup</a>(<a id="210"  class="move"  title="&#39;x&#39; (line 135) moved to &#39;x&#39; (line 198) (unchanged)" onclick="highlight('210','211','L135','L198')">x</a>, <a id="208"  class="move"  title="&#39;s&#39; (line 135) moved to &#39;s&#39; (line 198) (unchanged)" onclick="highlight('208','209','L135','L198')">s</a>):</div>
+<div class="line" id="L136"><span class="lineno">136 </span>    <a id="212"  class="move"  title="&#39;p&#39; (line 136) moved to &#39;p&#39; (line 199) (unchanged)" onclick="highlight('212','213','L136','L199')">p</a> = <a id="218"  class="move"  title="&#39;assq&#39; (line 136) moved to &#39;assq&#39; (line 199) (unchanged)" onclick="highlight('218','219','L136','L199')">assq</a>(<a id="216"  class="move"  title="&#39;x&#39; (line 136) moved to &#39;x&#39; (line 199) (unchanged)" onclick="highlight('216','217','L136','L199')">x</a>, <a id="214"  class="move"  title="&#39;s&#39; (line 136) moved to &#39;s&#39; (line 199) (unchanged)" onclick="highlight('214','215','L136','L199')">s</a>)</div>
+<div class="line" id="L137"><span class="lineno">137 </span>    <span class="keyword">if</span> <a id="224"  class="move"  title="&#39;p&#39; (line 137) moved to &#39;p&#39; (line 200) (unchanged)" onclick="highlight('224','225','L137','L200')">p</a> <a id="220"  class="move"  title="&#39;&lt;&gt;&#39; (line 137) moved to &#39;&lt;&gt;&#39; (line 200) (unchanged)" onclick="highlight('220','221','L137','L200')">&lt;&gt;</a> <a id="222"  class="move"  title="&#39;None&#39; (line 137) moved to &#39;None&#39; (line 200) (unchanged)" onclick="highlight('222','223','L137','L200')">None</a>:</div>
+<div class="line" id="L138"><span class="lineno">138 </span>        <span class="keyword">return</span> <a id="226"  class="move"  title="&#39;&#39;p&#39;.&#39;snd&#39;&#39; (line 138) moved to &#39;&#39;p&#39;.&#39;snd&#39;&#39; (line 201) (unchanged)" onclick="highlight('226','227','L138','L201')">p.snd</a></div>
+<div class="line" id="L139"><span class="lineno">139 </span>    else:</div>
+<div class="line" id="L140"><span class="lineno">140 </span>        <span class="keyword">return</span> <a id="228"  class="move"  title="&#39;None&#39; (line 140) moved to &#39;None&#39; (line 203) (unchanged)" onclick="highlight('228','229','L140','L203')">None</a></div>
+<div class="line" id="L141"><span class="lineno">141 </span></div>
+<div class="line" id="L142"><span class="lineno">142 </span></div>
+<div class="line" id="L143"><span class="lineno">143 </span></div>
+<div class="line" id="L144"><span class="lineno">144 </span># cmap was renamed to maplist, but the function</div>
+<div class="line" id="L145"><span class="lineno">145 </span># has been modified significantly since renaming.</div>
+<div class="line" id="L146"><span class="lineno">146 </span># Thus we no longer consider them to be the same</div>
+<div class="line" id="L147"><span class="lineno">147 </span># function.</div>
+<div class="line" id="L148"><span class="lineno">148 </span><span class="deletion" title="function &#39;cmap&#39; (line 148) deleted"><span class="keyword">def</span></span> cmap(f, ls):</div>
+<div class="line" id="L149"><span class="lineno">149 </span>    <span class="keyword">if</span> (ls == nil):</div>
+<div class="line" id="L150"><span class="lineno">150 </span>        <span class="keyword">return</span> nil</div>
+<div class="line" id="L151"><span class="lineno">151 </span>    else:</div>
+<div class="line" id="L152"><span class="lineno">152 </span>        <span class="keyword">return</span> Cons(f(ls.first), cmap(f, ls.rest))</div>
+<div class="line" id="L153"><span class="lineno">153 </span></div>
+<div class="line" id="L154"><span class="lineno">154 </span></div>
+<div class="line" id="L155"><span class="lineno">155 </span># reverse is unchanged</div>
+<div class="line" id="L156"><span class="lineno">156 </span><a id="48"  class="move"  title="function &#39;reverse&#39; (line 156) moved to function &#39;reverse&#39; (line 144) (unchanged)" onclick="highlight('48','49','L156','L144')"><span class="keyword">def</a></span> <a id="20"  class="move"  title="&#39;reverse&#39; (line 156) moved to &#39;reverse&#39; (line 144) (unchanged)" onclick="highlight('20','21','L156','L144')">reverse</a>(<a id="46"  class="move"  title="&#39;ls&#39; (line 156) moved to &#39;ls&#39; (line 144) (unchanged)" onclick="highlight('46','47','L156','L144')">ls</a>):</div>
+<div class="line" id="L157"><span class="lineno">157 </span>    <a id="44"  class="move"  title="&#39;ret&#39; (line 157) moved to &#39;ret&#39; (line 145) (unchanged)" onclick="highlight('44','45','L157','L145')">ret</a> = <a id="42"  class="move"  title="&#39;nil&#39; (line 157) moved to &#39;nil&#39; (line 145) (unchanged)" onclick="highlight('42','43','L157','L145')">nil</a></div>
+<div class="line" id="L158"><span class="lineno">158 </span>    <span class="keyword">while</span> <a id="36"  class="move"  title="&#39;ls&#39; (line 158) moved to &#39;ls&#39; (line 146) (unchanged)" onclick="highlight('36','37','L158','L146')">ls</a> <a id="40"  class="move"  title="&#39;&lt;&gt;&#39; (line 158) moved to &#39;&lt;&gt;&#39; (line 146) (unchanged)" onclick="highlight('40','41','L158','L146')">&lt;&gt;</a> <a id="38"  class="move"  title="&#39;nil&#39; (line 158) moved to &#39;nil&#39; (line 146) (unchanged)" onclick="highlight('38','39','L158','L146')">nil</a>:</div>
+<div class="line" id="L159"><span class="lineno">159 </span>        <a id="34"  class="move"  title="&#39;ret&#39; (line 159) moved to &#39;ret&#39; (line 147) (unchanged)" onclick="highlight('34','35','L159','L147')">ret</a> = <a id="28"  class="move"  title="&#39;Cons&#39; (line 159) moved to &#39;Cons&#39; (line 147) (unchanged)" onclick="highlight('28','29','L159','L147')">Cons</a>(<a id="30"  class="move"  title="&#39;&#39;ls&#39;.&#39;first&#39;&#39; (line 159) moved to &#39;&#39;ls&#39;.&#39;first&#39;&#39; (line 147) (unchanged)" onclick="highlight('30','31','L159','L147')">ls.first</a>, <a id="32"  class="move"  title="&#39;ret&#39; (line 159) moved to &#39;ret&#39; (line 147) (unchanged)" onclick="highlight('32','33','L159','L147')">ret</a>)</div>
+<div class="line" id="L160"><span class="lineno">160 </span>        <a id="26"  class="move"  title="&#39;ls&#39; (line 160) moved to &#39;ls&#39; (line 148) (unchanged)" onclick="highlight('26','27','L160','L148')">ls</a> = <a id="24"  class="move"  title="&#39;&#39;ls&#39;.&#39;rest&#39;&#39; (line 160) moved to &#39;&#39;ls&#39;.&#39;rest&#39;&#39; (line 148) (unchanged)" onclick="highlight('24','25','L160','L148')">ls.rest</a></div>
+<div class="line" id="L161"><span class="lineno">161 </span>    <span class="keyword">return</span> <a id="22"  class="move"  title="&#39;ret&#39; (line 161) moved to &#39;ret&#39; (line 149) (unchanged)" onclick="highlight('22','23','L161','L149')">ret</a></div>
+<div class="line" id="L162"><span class="lineno">162 </span></div>
+<div class="line" id="L163"><span class="lineno">163 </span></div>
+<div class="line" id="L164"><span class="lineno">164 </span></div>
+<div class="line" id="L165"><span class="lineno">165 </span># cfilter was renamed to filterlist, but the</div>
+<div class="line" id="L166"><span class="lineno">166 </span># function has been modified significantly since</div>
+<div class="line" id="L167"><span class="lineno">167 </span># renaming. Thus we no longer consider them to be</div>
+<div class="line" id="L168"><span class="lineno">168 </span># the same function.</div>
+<div class="line" id="L169"><span class="lineno">169 </span><span class="deletion" title="function &#39;cfilter&#39; (line 169) deleted"><span class="keyword">def</span></span> cfilter(f, ls):</div>
+<div class="line" id="L170"><span class="lineno">170 </span>    ret = nil</div>
+<div class="line" id="L171"><span class="lineno">171 </span>    <span class="keyword">while</span> ls &lt;&gt; nil:</div>
+<div class="line" id="L172"><span class="lineno">172 </span>        <span class="keyword">if</span> f(ls.first):</div>
+<div class="line" id="L173"><span class="lineno">173 </span>            ret = Cons(ls.first, ret)</div>
+<div class="line" id="L174"><span class="lineno">174 </span>        ls = ls.rest</div>
+<div class="line" id="L175"><span class="lineno">175 </span>    <span class="keyword">return</span> reverse(ret)</div>
+<div class="line" id="L176"><span class="lineno">176 </span></div>
+<div class="line" id="L177"><span class="lineno">177 </span>    # if (ls == nil):</div>
+<div class="line" id="L178"><span class="lineno">178 </span>    #     return nil</div>
+<div class="line" id="L179"><span class="lineno">179 </span>    # elif f(ls.first):</div>
+<div class="line" id="L180"><span class="lineno">180 </span>    #     return Cons(ls.first, cfilter(f, ls.rest))</div>
+<div class="line" id="L181"><span class="lineno">181 </span>    # else:</div>
+<div class="line" id="L182"><span class="lineno">182 </span>    #     return cfilter(f, ls.rest)</div>
+<div class="line" id="L183"><span class="lineno">183 </span></div>
+</div></pre>
+<div class="stats"><pre class="stats">
+--------------------- summary -----------------------
+- total changes (chars):  540
+- total code size:        967 (left: 440  right: 527)
+- total moved pieces:     2
+- percentage of change:   55.9%
+-----------------------------------------------------
+</pre></div></body>
+</html>

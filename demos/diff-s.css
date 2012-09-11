@@ -1,0 +1,101 @@
+/* yDiff - a language-aware tool for comparing programs */
+/* Copyright (C) 2011 Yin Wang (yinwang0@gmail.com) */
+
+
+/* This program is free software: you can redistribute it and/or modify */
+/* it under the terms of the GNU General Public License as published by */
+/* the Free Software Foundation, either version 3 of the License, or */
+/* (at your option) any later version. */
+
+/* This program is distributed in the hope that it will be useful, */
+/* but WITHOUT ANY WARRANTY; without even the implied warranty of */
+/* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the */
+/* GNU General Public License for more details. */
+
+/* You should have received a copy of the GNU General Public License */
+/* along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+
+
+
+.d {
+    border: solid 1px #CC929A;
+    /* border: solid 1px #E6A4AE; */
+    background-color: LightPink;
+}
+
+.i {
+    border: solid 1px #73BE73;
+    /* border: solid 1px #82D682; */
+    background-color: LightGreen;
+}
+
+.c {
+    border: solid 1px #8AADB8;
+    /* border: solid 1px #9CC2CF; */
+    background-color: LightBlue;
+    cursor: pointer;
+}
+
+.m {
+    border: solid 1px LightPink;
+    /* border: solid 1px #BEBEBE; */
+    cursor: pointer;
+}
+
+.mc {
+    border: solid 1px LightPink;
+    background-color: LightBlue;
+    /* border: solid 1px #BEBEBE; */
+    cursor: pointer;
+}
+
+.u {
+    border: solid 1px #A9A9A9;
+    /* border: solid 1px #BEBEBE; */
+    cursor: pointer;
+}
+
+span.lineno {
+    color: lightgrey;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+span.keyword {
+    /* color: #007070; */
+    font-weight: 700;
+}
+
+div.line {
+}
+
+div.src {
+    width:48%;
+    height:98%;
+    overflow:scroll;
+    border:1px solid;
+    float:left;
+    padding:0.5%;
+}
+
+
+div.stats {
+    border: solid 1px grey;
+    z-index: 1000;
+    width: 80%;
+    padding-left: 5%;
+}
+
+pre.stats {
+    color: grey;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+pre {
+    line-height: 200%;
+}
+
+p {
+    line-height: 200%;
+}
