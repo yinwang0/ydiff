@@ -92,13 +92,9 @@
 ;-----------------------------------------
 (define diff-scheme
   (lambda (file1 file2)
-    (load "diff-scheme.ss")
     (diff file1 file2 parse-scheme)))
 
 
 
-; (diff-scheme "tests/paredit20.el" "tests/paredit22.el")
-; (diff-scheme "tests/mk.scm" "tests/mk-c.scm")
-; (diff-scheme "tests/pass1.ss" "tests/pass2.ss")
-; (diff-scheme "parse-js.ss" "parse-cpp.ss")
-
+; (diff-scheme "demos/paredit20.el" "demos/paredit22.el")
+; (diff-scheme "demos/mk.scm" "demos/mk-c.scm")

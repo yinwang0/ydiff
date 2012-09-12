@@ -16,39 +16,43 @@
 
 
 
-(load "parse-cpp.ss")
-(load "diff.ss")
+#lang racket
+
+(require "structs.rkt")
+(require "parse-js.rkt")
+(require "sdiff.rkt")
+(require "utils.rkt")
+
+
 
 
 
 ;-------------------------------------------------------------
-;                      overrides
+;                         overrides
 ;-------------------------------------------------------------
 
-(define get-name
+(set-get-name
   (lambda (node)
     (let ([id-exp (match-tags node '(name identifier id))])
       (and id-exp (get-symbol (car (Expr-elts id-exp)))))))
 
-;; (get-name (car (parse1 $statement "int f(int x) {}")))
+
+;; (same-def? (car (parse1 $statement "function f(x) {}"))
+;;            (car (parse1 $statement "function f(x) {}")))
 
 
-;; (same-def? (car (parse1 $statement "int f(int x) {}"))
-;;            (car (parse1 $statement "int f(int x) {}")))
-
-
-;; (different-def? (car (parse1 $statement "int f(int x) {}"))
-;;                 (car (parse1 $statement "int g(int x) {}")))
-
-
-
-;---------------------------------------------
-(define diff-cpp
-  (lambda (file1 file2)
-    (diff file1 file2 parse-cpp)))
+;; (different-def? (car (parse1 $statement "function f(x) {}"))
+;;                 (car (parse1 $statement "function g(x) {}")))
 
 
 
-;---------------------------------------------
-; (diff-cpp "tests/simulator-mips.cc" "tests/simulator-arm.cc")
-; (diff-cpp "tests/d8-3404.cc" "tests/d8-8424.cc")
+;; command line interface
+(let* ([args (current-command-line-arguments)]
+       [file1 (vector-ref args 0)]
+       [file2 (vector-ref args 1)]
+       [s1 (read-file file1)]
+       [s2 (read-file file2)]
+       [node1 (parse-js s1)]
+       [node2 (parse-js s2)])
+  (diff node1 node2 file1 file2))
+

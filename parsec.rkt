@@ -15,14 +15,20 @@
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+#lang racket
 
-(load "utils.ss")
+(require "structs.rkt")
+(require "utils.rkt")
 
-(load "structs.rkt")
+(provide (all-defined-out))
 
+
+
+;----------------------------------------
+;               options
+;----------------------------------------
 
 (define *left-recur-detection* #f)
-
 
 
 
@@ -42,83 +48,29 @@
 (define *significant-whitespaces* '())
 
 
-;-------------------------------------------------------------
-;                       data types
-;-------------------------------------------------------------
-(struct Node    (start end)        #:transparent)
-(struct Expr     Node (type elts)  #:transparent)
-(struct Token    Node (text)       #:transparent)
-(struct Comment  Node (text)       #:transparent)
-(struct Str      Node (text)       #:transparent)
-(struct Char     Node (text)       #:transparent)
-(struct Newline  Node ()           #:transparent)
-(struct Phantom  Node ()           #:transparent)
+(define (set-delims x)
+  (set! *delims* x))
 
+(define (set-line-comment x)
+  (set! *line-comment* x))
 
+(define (set-comment-start x)
+  (set! *comment-start* x))
 
-(define decode-ast
-  (lambda (exp)
-    (match exp
-      [`(Expr ,start ,end ',type ,elts)
-       (Expr start end type (decode-ast elts))]
-      [`(Token ,start ,end ,text)
-       (Token start end text)]
-      [`(Comment ,start ,end ,text)
-       (Comment start end text)]
-      [`(Str ,start ,end ,text)
-       (Str start end text)]
-      [`(Newline ,start ,end)
-       (Newline start end)]
-      [`(Phantom ,start ,end)
-       (Phantom start end)]
-      [`(list ,elts ...)
-       (map decode-ast elts)]
-      [''() '()])))
+(define (set-comment-end x)
+  (set! *comment-end* x))
 
+(define (set-operators x)
+  (set! *operators* x))
 
+(define (set-quotation-marks x)
+  (set! *quotation-marks* x))
 
-(define node-type
-  (lambda (node)
-    (and (Expr? node) (Expr-type node))))
+(define (set-lisp-char x)
+  (set! *lisp-char* x))
 
-
-(define get-start
-  (lambda (node)
-    (Node-start node)))
-
-
-(define get-end
-  (lambda (node)
-    (Node-end node)))
-
-
-(define get-symbol
-  (lambda (node)
-    (cond
-     [(Token? node)
-      (string->symbol (Token-text node))]
-     [else #f])))
-
-
-(define get-tag
-  (lambda (e tag)
-    (let ([matches (filter (lambda (x)
-                             (and (Expr? x)
-                                  (eq? (Expr-type x) tag)))
-                           (Expr-elts e))])
-      (cond
-       [(null? matches) #f]
-       [else (car matches)]))))
-
-
-(define match-tags
-  (lambda (e tags)
-    (cond
-     [(not (Expr? e)) #f]
-     [(null? tags) e]
-     [else
-      (match-tags (get-tag e (car tags)) (cdr tags))])))
-
+(define (set-significant-whitespaces x)
+  (set! *significant-whitespaces* x))
 
 
 
@@ -129,6 +81,10 @@
 (define whitespace?  char-whitespace?)
 (define alpha?       char-alphabetic?)
 (define digit?       char-numeric?)
+
+(define set-alpha
+  (lambda (x)
+    (set! alpha? x)))
 
 
 ; Is char c a delimeter?
@@ -391,6 +347,10 @@
                 (values #f #f)]
                [else
                 (loop (cdr ps) r (cons t nodes))]))]))))))
+
+(define set-seq
+  (lambda (x)
+    (set! @seq x)))
 
 
 
@@ -922,38 +882,6 @@
                (values t r))]))))]))
 
 
-;; EXAMPLES:
-
-;; (::= $foo
-;;      (@= 'foo (@... $bar ($$ "foo"))))
-
-;; (::? $bar $baz
-;;      ($$ "bar"))
-
-;; (::= $baz
-;;      (@= 'baz (@... $bar ($$ "baz"))))
-
-
-;; ($eval $bar (scan "bar foo"))
-;; ($eval $foo (scan "bar foo"))
-;; ($eval $baz (scan "bar baz"))           ; only this one succeeds
-
-
-;; (::! $avoid-foo $foo
-;;      (@= 'avoid-foo ($$ "avoid-foo")))
-
-;; (::= $foo
-;;      (@= 'foo (@... $avoid-foo ($$ "foo"))))
-
-;; (::= $not-foo
-;;      (@= 'not-foo (@... $avoid-foo ($$ "not-foo"))))
-
-
-;; ($eval $foo (scan "avoid-foo foo"))     ; $avoid-foo fails only in foo
-;; ($eval $not-foo (scan "avoid-foo not-foo"))
-
-
-
 ;; execuate parser p on the input tokens
 (define $eval
   (lambda (p toks)
@@ -968,102 +896,4 @@
     (letv ([(t r) ($eval p (filter (lambda (x) (not (Comment? x)))
                                    (scan s)))])
       t)))
-
-
-
-
-
-
-;-------------------------------------------------------------
-;                    testing facilities
-;-------------------------------------------------------------
-
-(define test-string
-  (lambda (s)
-    (letv ([(t r) ($eval $program
-                         (filter (lambda (x) (not (Comment? x)))
-                                 (scan s)))])
-      (cond
-       [(null? r) #t]
-       [(not r) #f]
-       [else (car r)]))))
-
-
-
-
-
-(define test-file
-  (lambda files
-    (define test1
-      (lambda (file)
-        (printf "testing file: ~a ... " file)
-        (let ([start (current-seconds)])
-          (flush-output)
-          (let ([res (test-string (read-file file))])
-            (cond
-             [(eq? #t res)
-              (printf "succeed.~ntime used: ~a seconds~n"
-                      (- (current-seconds) start))
-              (flush-output)]
-             [else
-              (printf "failed at token: ~a~n" res)
-              (flush-output)])))))
-    (for-each test1 files)))
-
-
-
-
-
-;-------------------------- examples ---------------------------
-
-; a parser for s-expressions
-
-(:: $open
-     (@or (@~ "(") (@~ "[")))
-
-(:: $close
-     (@or (@~ ")") (@~ "]")))
-
-(:: $non-parens
-     (@and (@! $open) (@! $close)))
-
-(::= $parens 'sexp
-     (@seq $open (@* $sexp) $close))
-
-(:: $sexp
-    (@+ (@or $parens $non-parens)))
-
-(:: $program $sexp)
-
-
-(define parse-sexp
-  (lambda (s)
-    (first-val ($eval $program (scan s)))))
-
-
-;; (parse-sexp "(lambda (x) x)")
-;; (parse-sexp (read-file "paredit20.el"))
-
-
-
-
-;;-------------- direct left recursion test ---------------
-;;
-;; (::= $left 'left
-;;   (@or (@seq $left ($$ "ok"))
-;;        ($$ "ok")))
-
-;; ($eval $left (scan "ok"))
-
-
-;;---------- indirect left-recursion -------------
-;;
-;; (::= $left1 'left1
-;;   (@seq $left2 ($$ "ok")))
-
-;; (::= $left2 'left2
-;;   (@or (@seq $left1 ($$ "ok"))
-;;        ($$ "ok")))
-
-;; ($eval $left1 (scan "ok ok"))
 
