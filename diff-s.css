@@ -16,43 +16,40 @@
 /* along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 
 
-
-.d {
+.d {                            /* deleted */
     border: solid 1px #CC929A;
-    /* border: solid 1px #E6A4AE; */
-    background-color: LightPink;
+    border-radius: 4px;
+    background-color: #FCBFBA;
 }
 
-.i {
+.i {                            /* inserted */
     border: solid 1px #73BE73;
-    /* border: solid 1px #82D682; */
-    background-color: LightGreen;
+    border-radius: 4px;
+    background-color: #98FB98;
 }
 
-.c {
+.c {                            /* changed */
     border: solid 1px #8AADB8;
-    /* border: solid 1px #9CC2CF; */
     background-color: LightBlue;
     cursor: pointer;
 }
 
-.m {
-    border: solid 1px LightPink;
-    /* border: solid 1px #BEBEBE; */
-    cursor: pointer;
+.m {                            /* moved */
+    border: dashed 1px #A9A9A9;
+    border-radius: 4px;
+    cursor: crosshair;
 }
 
 .mc {
     border: solid 1px LightPink;
     background-color: LightBlue;
-    /* border: solid 1px #BEBEBE; */
     cursor: pointer;
 }
 
-.u {
+.u {                            /* unchanged */
     border: solid 1px #A9A9A9;
-    /* border: solid 1px #BEBEBE; */
-    cursor: pointer;
+    border-radius: 4px;
+    cursor: crosshair;
 }
 
 span.lineno {
@@ -73,9 +70,10 @@ div.src {
     width:48%;
     height:98%;
     overflow:scroll;
-    border:1px solid;
     float:left;
     padding:0.5%;
+    border: solid 2px LightGrey;
+    border-radius: 5px;
 }
 
 
@@ -98,4 +96,18 @@ pre {
 
 p {
     line-height: 200%;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.5);
 }
