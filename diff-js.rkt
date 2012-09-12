@@ -34,7 +34,7 @@
 (set-get-name
   (lambda (node)
     (let ([id-exp (match-tags node '(name identifier id))])
-      (and id-exp (get-symbol (car (Expr-elts id-exp)))))))
+      (and id-exp (get-symbol (car (Node-elts id-exp)))))))
 
 
 ;; (same-def? (car (parse1 $statement "function f(x) {}"))
@@ -55,4 +55,3 @@
        [node1 (parse-js s1)]
        [node2 (parse-js s2)])
   (diff node1 node2 file1 file2))
-

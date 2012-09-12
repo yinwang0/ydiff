@@ -19,8 +19,9 @@
 (define get-keyword
   (lambda (node)
     (match node
-      [(Expr _ _ type elts)
+      [(Node type _ _ elts)
        (cond
+        [(not (pair? elts)) #f]
         [(null? elts) #f]
         [else
          (let ([sym (get-symbol (car elts))])
@@ -30,23 +31,28 @@
       [_ #f])))
 
 
+;; Try to get the keyword of the sexp if it is not token, comment, str
+;; and char.
 (set-get-type
   (lambda (node)
     (cond
-     [(Expr? node)
-      (get-keyword node)]
-     [(Token? node) 'token]
-     [(Comment? node) 'comment]
-     [(Str? node) 'str]
-     [(Char? node) 'char])))
+     [(token? node) 'token]
+     [(comment? node) 'comment]
+     [(str? node) 'str]
+     [(character? node) 'char]
+     [else
+      (get-keyword node)])))
 
 
 (set-get-name
   (lambda (node)
     (let ([key (get-keyword node)])
       (cond
-       [(and key (memq key *defs*))
-        (get-symbol (cadr (Expr-elts node)))]
+       [(and key
+             (memq key *defs*)
+             (pair? (Node-elts node))
+             (not (null? (cdr (Node-elts node)))))
+        (get-symbol (cadr (Node-elts node)))]
        [else #f]))))
 
 
@@ -58,4 +64,3 @@
        [node1 (parse-scheme s1)]
        [node2 (parse-scheme s2)])
   (diff node1 node2 file1 file2))
-

@@ -32,7 +32,7 @@
 (set-get-name
   (lambda (node)
     (let ([id-exp (match-tags node '(name identifier id))])
-      (and id-exp (get-symbol (car (Expr-elts id-exp)))))))
+      (and id-exp (get-symbol (car (Node-elts id-exp)))))))
 
 ;; (get-name (car (parse1 $statement "int f(int x) {}")))
 

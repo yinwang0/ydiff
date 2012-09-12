@@ -124,7 +124,7 @@
 (define deframe
   (lambda (node)
     (match node
-      [(Expr _ _ 'frame elts)
+      [(Node 'frame _ _ elts)
        (apply append (map deframe elts))]
      [else (list node)])))
 
@@ -144,11 +144,11 @@
 (define extract-frame
   (lambda (node1 node2 type)
     (match node1
-      [(Expr start1 end1 type1 elts1)
+      [(Node type1 start1 end1 elts1)
        (let ([frame-elts (filter (lambda (x)
                                    (not (eq? x node2)))
                                  elts1)])
-         (type (Expr start1 start1 'frame frame-elts)))]
+         (type (Node 'frame start1 start1 frame-elts)))]
       [_ fatal 'extract-frame "I only accept Expr"])))
 
 
@@ -173,14 +173,7 @@
 
 ;; "virtual function" - get node type
 ;; can be overridden by individual languages
-(define get-type
-  (lambda (node)
-    (cond
-     [(Expr? node) (Expr-type node)]
-     [(Token? node) 'token]
-     [(Comment? node) 'comment]
-     [(Str? node) 'str]
-     [(Char? node) 'char])))
+(define get-type Node-type)
 
 (define set-get-type
   (lambda (fun)
@@ -244,13 +237,13 @@
     (cond
      [(pair? node)
       (apply + (map node-size node))]
-     [(or (Token? node) (Str? node) (Char? node)) 1]
-     [(Expr? node)
+     [(or (token? node) (str? node) (character? node)) 1]
+     [(Node? node)
       (cond
        [(hash-has-key? *node-size-hash* node)
         (hash-ref *node-size-hash* node)]
        [else
-        (memo (node-size (Expr-elts node)))])]
+        (memo (node-size (Node-elts node)))])]
      [else 0])))
 
 
@@ -260,8 +253,8 @@
      [(null? node) 0]
      [(pair? node)
       (apply max (map node-depth node))]
-     [(Expr? node)
-      (add1 (node-depth (Expr-elts node)))]
+     [(Node? node)
+      (add1 (node-depth (Node-elts node)))]
      [else 0])))
 
 
@@ -407,19 +400,19 @@
      [(hash-get *diff-hash* node1 node2)
       => (lambda (cached)
            (values (car cached) (cdr cached)))]
-     [(and (Char? node1) (Char? node2))
-      (diff-string (char->string (Char-text node1))
-                   (char->string (Char-text node2))
+     [(and (character? node1) (character? node2))
+      (diff-string (char->string (Node-elts node1))
+                   (char->string (Node-elts node2))
                    node1 node2)]
-     [(and (Str? node1) (Str? node2))
-      (diff-string (Str-text node1) (Str-text node2) node1 node2)]
-     [(and (Comment? node1) (Comment? node2))
-      (diff-string (Comment-text node1) (Comment-text node2) node1 node2)]
-     [(and (Token? node1) (Token? node2))
-      (diff-string (Token-text node1) (Token-text node2) node1 node2)]
-     [(and (Expr? node1) (Expr? node2)
+     [(and (str? node1) (str? node2))
+      (diff-string (Node-elts node1) (Node-elts node2) node1 node2)]
+     [(and (comment? node1) (comment? node2))
+      (diff-string (Node-elts node1) (Node-elts node2) node1 node2)]
+     [(and (token? node1) (token? node2))
+      (diff-string (Node-elts node1) (Node-elts node2) node1 node2)]
+     [(and (Node? node1) (Node? node2)
            (eq? (get-type node1) (get-type node2)))
-      (letv ([(m c) (diff-list (Expr-elts node1) (Expr-elts node2) move?)])
+      (letv ([(m c) (diff-list (Node-elts node1) (Node-elts node2) move?)])
         (try-extract m c))]
      [(and (pair? node1) (not (pair? node2)))
       (diff-list node1 (list node2) move?)]
@@ -517,10 +510,10 @@
      [(or (< (node-size node1) *move-size*)
           (< (node-size node2) *move-size*))
       (values #f #f)]
-     [(and (Expr? node1) (Expr? node2))
+     [(and (Node? node1) (Node? node2))
       (cond
        [(<= (node-size node1) (node-size node2))
-        (let loop ([elts2 (Expr-elts node2)])
+        (let loop ([elts2 (Node-elts node2)])
           (cond
            [(null? elts2) (values #f #f)]
            [else
@@ -533,7 +526,7 @@
                [else
                 (loop (cdr elts2))]))]))]
        [else
-        (let loop ([elts1 (Expr-elts node1)])
+        (let loop ([elts1 (Node-elts node1)])
           (cond
            [(null? elts1) (values #f #f)]
            [else
@@ -583,7 +576,7 @@
        [(and name1 (not name2)) #t]
        [(and (not name1) name2) #f]
        [else
-        (< (get-start x) (get-start y))]))))
+        (< (Node-start x) (Node-start y))]))))
 
 
 
@@ -592,7 +585,7 @@
   (lambda (changes)
     (set! *diff-hash* (make-hasheq))
     (let loop ([changes changes] [closed '()] [count 1])
-      (printf "~n[closure loop #~a] " count)
+      (printf "~n[move pass #~a] " count)
       (letv ([dels (filter (predand del? big-change?) changes)]
              [adds (filter (predand ins? big-change?) changes)]
              [rest (set- changes (append dels adds))]
@@ -646,17 +639,17 @@
                        (Change-cur (car cs)))])
           (cond
            [(or (not key)
-                (= (get-start key) (get-end key)))
+                (= (Node-start key) (Node-end key)))
             (loop (cdr cs) tags)]
            [(and (Change-orig (car cs)) (Change-cur (car cs)))
             (let ([startTag (Tag (link-start (car cs) side)
-                                 (get-start key) -1)]
-                  [endTag (Tag "</a>" (get-end key) (get-start key))])
+                                 (Node-start key) -1)]
+                  [endTag (Tag "</a>" (Node-end key) (Node-start key))])
               (loop (cdr cs) (cons endTag (cons startTag tags))))]
            [else
             (let ([startTag (Tag (span-start (car cs) side)
-                                 (get-start key) -1)]
-                  [endTag (Tag "</span>" (get-end key) (get-start key))])
+                                 (Node-start key) -1)]
+                  [endTag (Tag "</span>" (Node-end key) (Node-start key))])
               (loop (cdr cs) (cons endTag (cons startTag tags))))]))]))))
 
 
@@ -850,4 +843,3 @@
 ;;       [file1 (symbol->string (read))]
 ;;       [file2 (symbol->string (read))])
 ;;   (diff node1 node2 file1 file2))
-

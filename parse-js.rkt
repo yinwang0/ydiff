@@ -69,20 +69,20 @@
 (:: $identifier
   ($pred
    (lambda (t)
-     (and (Token? t)
-          (id? (Token-text t))))))
+     (and (token? t)
+          (id? (Node-elts t))))))
 
 
 (:: $numeral-literal
   ($pred
    (lambda (t)
-     (and (Token? t)
-          (numeral? (Token-text t))))))
+     (and (token? t)
+          (numeral? (Node-elts t))))))
 
 
-(:: $string-literal ($pred Str?))
-(:: $newline ($pred Newline?))
-(:: $comment ($pred Comment?))
+(:: $string-literal ($pred str?))
+(:: $newline ($pred newline?))
+(:: $comment ($pred comment?))
 
 
 ;; delimeters
@@ -688,8 +688,7 @@
     (set-parameters)
     (first-val
      ($eval $program
-            (filter (lambda (x) (not (Comment? x)))
-                    (scan s))))))
+            (filter (negate comment?) (scan s))))))
 
 
 
@@ -699,4 +698,3 @@
 ;-------------------------------------------------------------
 
 ;; (parse-js (read-file "nav-div.js"))
-

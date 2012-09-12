@@ -192,7 +192,8 @@
          [(= start (string-length s)) (values 'eof start)]
 
          [(start-with-one-of s start *significant-whitespaces*)
-          (values (Newline start (add1 start)) (add1 start))]
+          (values (Node 'newline start (add1 start) '()) 
+                  (add1 start))]
 
          [(whitespace? (string-ref s start))
           (scan1 s (add1 start))]
@@ -201,7 +202,10 @@
           (let ([line-end (find-next s start
                                      (lambda (s start)
                                        (eq? (string-ref s start) #\newline)))])
-            (values (Comment start (add1 line-end) (substring s start line-end))
+            (values (Node 'comment
+                          start
+                          (add1 line-end)
+                          (substring s start line-end))
                     line-end))]
 
          [(start-with s start *comment-start*) ; block comment
@@ -209,17 +213,23 @@
                                       (lambda (s start)
                                         (start-with s start *comment-end*)))]
                  [end (+ line-end (string-length *comment-end*))])
-            (values (Comment start end (substring s start end)) end))]
+            (values (Node 'comment 
+                          start
+                          end
+                          (substring s start end)) 
+                    end))]
 
          [(find-delim s start) =>
           (lambda (delim)
             (let ([end (+ start (string-length delim))])
-              (values (Token start end delim) end)))]
+              (values (Node 'token start end delim)
+                      end)))]
 
          [(find-operator s start) =>
           (lambda (op)
             (let ([end (+ start (string-length op))])
-              (values (Token start end op) end)))]
+              (values (Node 'token start end op)
+                      end)))]
 
          [(start-with-one-of s start *quotation-marks*)   ; string
           (let ([reg-match (or (regexp-match (regexp "^\"(\\\\.|[^\"])*\"")
@@ -232,11 +242,10 @@
              [else
               (let* ([len (string-length (car reg-match))]
                      [end (+ start len)])
-                (values (Str start end (car reg-match)) end))]))]
+                (values (Node 'str start end (car reg-match)) 
+                        end))]))]
 
-         ;; => (lambda (q) (scan-string s start q))
-
-         [(start-with-one-of s start *lisp-char*) ; scheme/elisp char
+         [(start-with-one-of s start *lisp-char*)         ; scheme/elisp char
           (cond
            [(<= (string-length s) (+ 2 start))
             (error 'scan-string "reached EOF while scanning char")]
@@ -248,7 +257,8 @@
                            (delim? (string-ref s end)))
                        end]
                       [else (loop (add1 end))]))])
-              (values (Char start end (string-ref s (sub1 end))) end))])]
+              (values (Node 'char start end (string-ref s (sub1 end)))
+                      end))])]
 
          [else                        ; identifier or number
           (let loop ([pos start] [chars '()])
@@ -258,7 +268,8 @@
                   (find-delim s pos)
                   (find-operator s pos))
               (let ([text (list->string (reverse chars))])
-                (values (Token start pos text) pos))]
+                (values (Node 'token start pos text) 
+                        pos))]
              [else
               (loop (add1 pos) (cons (string-ref s pos) chars))]))])))
 
@@ -364,7 +375,7 @@
             (cond
              [(not t) (values #f #f)]
              [else
-              (values (filter (negate Phantom?) t) r)])))))))
+              (values (filter (negate phantom?) t) r)])))))))
 
 
 ; (((@seq)) (scan "ok"))
@@ -401,17 +412,18 @@
             (cond
              [(not t) (values #f #f)]
              [(not type)
-              (values (filter (negate Phantom?) t) r)]
+              (values (filter (negate phantom?) t) r)]
              [(null? t)
-              (values (list (Expr (get-start (car toks))
-                                  (get-start (car toks))
-                                  type '()))
+              (values (list (Node type 
+                                  (Node-start (car toks))
+                                  (Node-start (car toks))
+                                  '()))
                       r)]
              [else
-              (values (list (Expr (get-start (car t))
-                                  (get-end (last t))
-                                  type
-                                  (filter (negate Phantom?) t)))
+              (values (list (Node type 
+                                  (Node-start (car t))
+                                  (Node-end (last t))
+                                  (filter (negate phantom?) t)))
                       r)])))))))
 
 
@@ -568,8 +580,10 @@
                [(null? t)
                 (values '() r)]
                [else
-                (values (list (Phantom (get-start (car t))
-                                       (get-end (last t))))
+                (values (list (Node 'phantom
+                                    (Node-start (car t))
+                                    (Node-end (last t))
+                                    '()))
                         r)])])))))))
 
 
@@ -611,7 +625,7 @@
   (lambda (s)
     ($pred
      (lambda (x)
-       (and (Token? x) (string=? (Token-text x) s))))))
+       (and (token? x) (string=? (Node-elts x) s))))))
 
 
 (define @_
@@ -657,9 +671,10 @@
          (cond
           [(null? fields) ret]
           [else
-           (let ([e (Expr (get-start ret)
-                          (get-end (cadr fields))
-                          type (list ret (car fields) (cadr fields)))])
+           (let ([e (Node type 
+                          (Node-start ret)
+                          (Node-end (cadr fields))
+                          (list ret (car fields) (cadr fields)))])
              (loop (cddr fields) e))]))))
 
 
@@ -671,9 +686,10 @@
            (cond
             [(null? fields) ret]
             [else
-             (let ([e (Expr (get-start (cadr fields))
-                            (get-end ret)
-                            type (list (cadr fields) (car fields) ret))])
+             (let ([e (Node type
+                            (Node-start (cadr fields))
+                            (Node-end ret)
+                            (list (cadr fields) (car fields) ret))])
                (loop (cddr fields) e))])))))
 
 
@@ -755,9 +771,9 @@
          (cond
           [(null? ls) ret]
           [else
-           (let ([e (Expr (get-start ret)
-                          (get-end (car ls))
-                          type
+           (let ([e (Node type
+                          (Node-start ret)
+                          (Node-end (car ls))
                           (list ret (car ls)))])
              (loop (cdr ls) e))]))))
 
@@ -780,9 +796,9 @@
      [(null? (cdr ls)) (car ls)]
      [else
       (let ([tail (make-prefix type (cdr ls))])
-        (Expr (get-start (car ls))
-              (get-end tail)
-              type
+        (Node type
+              (Node-start (car ls))
+              (Node-end tail)
               (list (car ls) tail)))])))
 
 
@@ -893,7 +909,7 @@
 
 (define parse1
   (lambda (p s)
-    (letv ([(t r) ($eval p (filter (lambda (x) (not (Comment? x)))
+    (letv ([(t r) ($eval p (filter (lambda (x) (not (comment? x)))
                                    (scan s)))])
       t)))
 

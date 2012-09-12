@@ -63,8 +63,8 @@
 (:: $id
     ($pred
      (lambda (t)
-       (and (Token? t)
-            (id? (Token-text t))))))
+       (and (token? t)
+            (id? (Node-elts t))))))
 
 
 (::= $identifier 'identifier
@@ -80,13 +80,13 @@
 (:: $numeral-literal
     ($pred
      (lambda (t)
-       (and (Token? t)
-            (numeral? (Token-text t))))))
+       (and (token? t)
+            (numeral? (Node-elts t))))))
 
-(:: $char-literal ($pred Char?))
-(:: $string-literal ($pred Str?))
-(:: $newline ($pred Newline?))
-(:: $comment ($pred Comment?))
+(:: $char-literal ($pred character?))
+(:: $string-literal ($pred str?))
+(:: $newline ($pred newline?))
+(:: $comment ($pred comment?))
 
 
 ;; delimeters
@@ -863,7 +863,7 @@
     (set-parameters)
     (first-val
      ($eval $program
-            (filter (lambda (x) (not (Comment? x)))
+            (filter (lambda (x) (not (comment? x)))
                     (scan s))))))
 
 

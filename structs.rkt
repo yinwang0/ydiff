@@ -6,77 +6,77 @@
 ;-------------------------------------------------------------
 ;                       data types
 ;-------------------------------------------------------------
-(struct Node    (start end)        #:transparent)
-(struct Expr     Node (type elts)  #:transparent)
-(struct Token    Node (text)       #:transparent)
-(struct Comment  Node (text)       #:transparent)
-(struct Str      Node (text)       #:transparent)
-(struct Char     Node (text)       #:transparent)
-(struct Newline  Node ()           #:transparent)
-(struct Phantom  Node ()           #:transparent)
+(struct Node (type start end elts) #:transparent)
 
+
+(define comment?
+  (lambda (n)
+    (and (Node? n) (eq? 'comment (Node-type n)))))
+
+
+(define phantom?
+  (lambda (n)
+    (and (Node? n) (eq? 'phantom (Node-type n)))))
+
+
+(define token?
+  (lambda (n)
+    (and (Node? n) (eq? 'token (Node-type n)))))
+
+(define str?
+  (lambda (n)
+    (and (Node? n) (eq? 'str (Node-type n)))))
+
+(define character?
+  (lambda (n)
+    (and (Node? n) (eq? 'char (Node-type n)))))
+
+(define newline?
+  (lambda (n)
+    (and (Node? n) (eq? 'newline (Node-type n)))))
 
 
 (define decode-ast
   (lambda (exp)
     (match exp
-      [`(Expr ,start ,end ',type ,elts)
-       (Expr start end type (decode-ast elts))]
-      [`(Token ,start ,end ,text)
-       (Token start end text)]
-      [`(Comment ,start ,end ,text)
-       (Comment start end text)]
-      [`(Str ,start ,end ,text)
-       (Str start end text)]
-      [`(Newline ,start ,end)
-       (Newline start end)]
-      [`(Phantom ,start ,end)
-       (Phantom start end)]
+      [`(Node ',type ,start ,end ,elts)
+       (Node start end type (decode-ast elts))]
       [`(list ,elts ...)
        (map decode-ast elts)]
       [''() '()])))
 
 
-
-(define node-type
-  (lambda (node)
-    (and (Expr? node) (Expr-type node))))
-
-
-(define get-start
-  (lambda (node)
-    (Node-start node)))
-
-
-(define get-end
-  (lambda (node)
-    (Node-end node)))
-
-
 (define get-symbol
   (lambda (node)
     (cond
-     [(Token? node)
-      (string->symbol (Token-text node))]
+     [(token? node)
+      (string->symbol (Node-elts node))]
      [else #f])))
 
 
+;; Find the first node elements which matches a given tag.
 (define get-tag
-  (lambda (e tag)
-    (let ([matches (filter (lambda (x)
-                             (and (Expr? x)
-                                  (eq? (Expr-type x) tag)))
-                           (Expr-elts e))])
-      (cond
-       [(null? matches) #f]
-       [else (car matches)]))))
+  (lambda (node tag)
+    (cond
+     [(not (Node? node)) #f]
+     [(not (pair? (Node-elts node))) #f]
+     [(null? (Node-elts node)) #f]
+     [else
+      (let ([matches (filter (lambda (x)
+                               (eq? (Node-type x) tag))
+                             (Node-elts node))])
+        (cond
+         [(null? matches) #f]
+         [else (car matches)]))])))
 
+
+;; Find the first node containing a given path of tags.
+;; For example: '(function parameter) could match a function's parameter
 
 (define match-tags
   (lambda (e tags)
     (cond
-     [(not (Expr? e)) #f]
+     [(not (Node? e)) #f]
      [(null? tags) e]
      [else
       (match-tags (get-tag e (car tags)) (cdr tags))])))
-
