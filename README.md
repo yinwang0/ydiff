@@ -1,21 +1,23 @@
-* INSTALLATION
+### INSTALLATION
 
-ydiff is implemented in Scheme. The Scheme implementation used for
-this project is Racket. You can get it from http://racket-lang.org.
+ydiff is implemented in Racket. You can get Racket from
 
-To build it, go to the directory containing the source and run "make".
-It should compile to several executables, such as "diff-scheme",
-"diff-cpp" etc. Copy those files to some directory in your PATH.
+    http://racket-lang.org
+
+To build ydiff, go to the directory containing the source and run
+"make". It should compile to several executables, such as
+"diff-scheme", "diff-cpp" etc. Copy those files to some directory in
+your PATH.
 
 
 
-* USAGE
+### USAGE
 
 1. Run commands like:
 
-    diff-scheme demos/mk.scm demos/mk-c.scm
+       diff-scheme demos/mk.scm demos/mk-c.scm
 
-It will produce a HTML file named "file1-file2.html" in the current
+   It will produce a HTML file named "mk-mk-c.html" in the current
 directory.
 
 
@@ -23,15 +25,17 @@ directory.
 directory, then use your browser to open the HTML file. You can scroll
 the file and click on the names to see the interactive effects.
 
-NOTICE: If you use Chrome, the JavaScript will not run on local files,
+   NOTICE: If you use Chrome, the JavaScript will not run on local files,
 so you may need to install a web server on your machine to view the
 file correctly. I recommend mongoose:
 
-    http://code.google.com/p/mongoose
+       http://code.google.com/p/mongoose
 
-Just put the executable in your directory and run it, then visit
-"localhost:8080". Have fun!
+   Just put the executable in your directory and run it, then visit
+"localhost:8080". 
 
+
+Have fun!
 
 
 * Contact
