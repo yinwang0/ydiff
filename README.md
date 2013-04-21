@@ -33,15 +33,15 @@ your PATH.
    there.
 
 
-2. If you use Chrome, it will not execute JavaScript on local files,
-   so you may need to install a web server on your machine to view the
-   file correctly. I recommend
+2. Chrome and Opera will not execute JavaScript on local files, so you
+   may need to install a web server on your machine to view the file
+   correctly. I recommend
    [mongoose](http://code.google.com/p/mongoose). Just put the
    executable in your directory and run it, then visit
    "localhost:8080".
 
-   Other browsers (Safari, Firefox, Opera) hasn't this issue and can
-   be used directly on the file.
+   Other browsers (Safari, Firefox, IE) hasn't this issue and can be used
+   directly on the file.
 
 
 
