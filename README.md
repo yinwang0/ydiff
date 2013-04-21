@@ -21,21 +21,28 @@ your PATH.
    directory.
 
 
-2. Copy the support files "diff-s.css" and "nav-div.js" to the current
-   directory, then use your browser to open the HTML file. You can
-   scroll the file and click on the names to see the interactive
-   effects.
+2. Use your browser to open the HTML file. That is basically it.
 
-   NOTICE: If you use Chrome, the JavaScript will not run on local
-   files, so you may need to install a web server on your machine to
-   view the file correctly. I recommend
-   [mongoose](http://code.google.com/p/mongoose).
 
-   Just put the executable in your directory and run it, then visit
+
+### Caveats
+
+
+1. The HTML file needs the support files `diff-s.css` and `nav-div.js`
+   to be present in the same directory. You must copy those files
+   there.
+
+
+2. If you use Chrome, it will not execute JavaScript on local files,
+   so you may need to install a web server on your machine to view the
+   file correctly. I recommend
+   [mongoose](http://code.google.com/p/mongoose). Just put the
+   executable in your directory and run it, then visit
    "localhost:8080".
 
+   Other browsers (Safari, Firefox, Opera) hasn't this issue and can
+   be used directly on the file.
 
-Have fun!
 
 
 ### Contact
