@@ -18,21 +18,21 @@ your PATH.
         diff-scheme demos/mk.scm demos/mk-c.scm
 
    It will produce a HTML file named "mk-mk-c.html" in the current
-directory.
+   directory.
 
 
 2. Copy the support files "diff-s.css" and "nav-div.js" to the current
-directory, then use your browser to open the HTML file. You can scroll
-the file and click on the names to see the interactive effects.
+   directory, then use your browser to open the HTML file. You can
+   scroll the file and click on the names to see the interactive
+   effects.
 
-   NOTICE: If you use Chrome, the JavaScript will not run on local files,
-so you may need to install a web server on your machine to view the
-file correctly. I recommend mongoose:
-
-        http://code.google.com/p/mongoose
+   NOTICE: If you use Chrome, the JavaScript will not run on local
+   files, so you may need to install a web server on your machine to
+   view the file correctly. I recommend
+   [mongoose](http://code.google.com/p/mongoose).
 
    Just put the executable in your directory and run it, then visit
-"localhost:8080". 
+   "localhost:8080".
 
 
 Have fun!
