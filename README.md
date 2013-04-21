@@ -15,7 +15,7 @@ your PATH.
 
 1. Run commands like:
 
-       diff-scheme demos/mk.scm demos/mk-c.scm
+        diff-scheme demos/mk.scm demos/mk-c.scm
 
    It will produce a HTML file named "mk-mk-c.html" in the current
 directory.
@@ -29,7 +29,7 @@ the file and click on the names to see the interactive effects.
 so you may need to install a web server on your machine to view the
 file correctly. I recommend mongoose:
 
-       http://code.google.com/p/mongoose
+        http://code.google.com/p/mongoose
 
    Just put the executable in your directory and run it, then visit
 "localhost:8080". 
@@ -38,13 +38,13 @@ file correctly. I recommend mongoose:
 Have fun!
 
 
-* Contact
+### Contact
 
 Yin Wang (yinwang0@gmail.com)
 
 
 
-* LICENSE
+### LICENSE
 
 Copyright (C) 2011 Yin Wang
 
