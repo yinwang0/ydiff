@@ -1,3 +1,25 @@
+// ydiff - a language-aware tool for comparing programs
+// Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
+
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+
+// convenience function for document.getElementById().
+window['$']=function(a){return document.getElementById(a)};
+
 
 /////////////////////// debug flag ////////////////////////
 var debug = false;
@@ -7,8 +29,8 @@ var debug = false;
 var minStep = 10;
 var nSteps = 30;
 var stepInterval = 10;
-var blockRange = 15;                    // how far consider one page blocked
-var nodeHLColor = 'lightgrey';
+var blockRange = 5;                    // how far consider one page blocked
+var nodeHLColor = '#C9B0A9';
 var lineHLColor = '#FFFF66';
 var lineBlockedColor = '#E9AB17';
 var bgColor = '';
@@ -16,10 +38,12 @@ var bodyBlockedColor = '#FAF0E6';
 
 
 ///////////////////////// globals ////////////////////////
-var eventCount = 0;
+var eventCount = { 'left' : 0, 'right' : 0};
 var moving = false;
-var matchId = -1;
-var matchLineId = -1;
+var matchId1 = 'leftstart';
+var matchId2 = 'rightstart';
+var matchLineId1 = -1;
+var matchLineId2 = -1;
 var cTimeout;
 
 
@@ -39,22 +63,14 @@ function sign(x) {
 
 function log(msg) {
     if (debug) {
-        console.log("[ " + window.name + " ] " + msg);
+        console.log(msg);
     }
 }
 
 
-///////////////////// window scrolling stuff ////////////////////
-
-// accessing other window
-if (window.name == 'left') {
-    otherside = parent.right;
-} else {
-    otherside = parent.left;
-}
 
 function elementPosition(id) {
-    obj = document.getElementById(id);
+    obj = $(id);
     var curleft = 0, curtop = 0;
 
     if (obj && obj.offsetParent) {
@@ -74,63 +90,67 @@ function elementPosition(id) {
 /*
  * Scroll the window to relative position, detecting blocking positions.
  */
-function scrollWithBlockCheck(distX, distY) {
-    var oldTop = document.body.scrollTop;
-    var oldLeft = document.body.scrollLeft;
+function scrollWithBlockCheck(container, distX, distY) {
+    var oldTop = container.scrollTop;
+    var oldLeft = container.scrollLeft;
 
-    eventCount++;
-    window.scrollBy(distX, distY);      // the ONLY place for actual scrolling
+    container.scrollTop += distY;      // the ONLY place for actual scrolling
+    container.scrollLeft += distX;
 
-    var actualX = document.body.scrollLeft - oldLeft;    
-    var actualY = document.body.scrollTop - oldTop;
+    var actualX = container.scrollLeft - oldLeft;
+    var actualY = container.scrollTop - oldTop;
     log("distY=" + distY + ", actualY=" + actualY);
+    log("distX=" + distX + ", actualX=" + actualX);
 
     // extra leewaw here because Chrome scrolling is horribly inacurate
-    if ((Math.abs(distX) > blockRange && actualX == 0)
-        || Math.abs(distY) > blockRange && actualY == 0) {
+    if ((Math.abs(distX) > blockRange && actualX === 0)
+        || Math.abs(distY) > blockRange && actualY === 0) {
         log("blocked");
-        eventCount--;
-        document.body.style.backgroundColor = bodyBlockedColor;
-        putHighlight(matchLineId, lineBlockedColor);
-        with (otherside) {
-            putHighlight(matchLineId, lineBlockedColor);
-        }
+        container.style.backgroundColor = bodyBlockedColor;
         return true;
     } else {
-        document.body.style.backgroundColor = bgColor;
-        otherside.document.body.style.backgroundColor = bgColor;
-        putHighlight(matchLineId, lineHLColor);
-        with (otherside) {
-            putHighlight(matchLineId, lineHLColor);
-        }
+        eventCount[container.id] += 1;
+        container.style.backgroundColor = bgColor;
         return false;
     }
+}
+
+
+function getContainer(elm) {
+    while (elm && elm.tagName !== 'DIV') {
+        elm = elm.parentElement || elm.parentNode;
+    }
+    return elm;
 }
 
 
 /*
  * timed animation function for scrolling the current window
  */
-function matchWindow(n)
+function matchWindow(linkId, targetId, n)
 {
     moving = true;
 
-    var linkPos = otherside.elementPosition(otherside.matchId).y;
-    var linkOffset = linkPos - otherside.document.body.scrollTop;
-    var targetPos = document.body.scrollTop + linkOffset
-    var curPos = elementPosition(matchId).y;
-    var distY = curPos - targetPos;
-    var distX = otherside.document.body.scrollLeft
-        - document.body.scrollLeft;
+    var link = $(linkId);
+    var target = $(targetId);
+    var linkContainer = getContainer(link);
+    var targetContainer = getContainer(target);
 
-    log("matching window... " + n + " distY=" + distY);
+    var linkPos = elementPosition(linkId).y - linkContainer.scrollTop;
+    var targetPos = elementPosition(targetId).y - targetContainer.scrollTop;
+    var distY = targetPos - linkPos;
+    var distX = linkContainer.scrollLeft - targetContainer.scrollLeft;
 
-    if (distY == 0 && distX == 0) {
+
+    log("matching window... " + n + " distY=" + distY + " distX=" + distX);
+
+    if (distY === 0 && distX === 0) {
+        clearTimeout(cTimeout);
         moving = false;
     } else if (n <= 1) {
-        scrollWithBlockCheck(distX, distY);
-        moving = false;        
-    } else{
+        scrollWithBlockCheck(targetContainer, distX, distY);
+        moving = false;
+    } else {
         var stepSize = Math.floor(Math.abs(distY) / n);
         actualMinStep = Math.min(minStep, Math.abs(distY));
         if (Math.abs(stepSize) < minStep) {
@@ -138,76 +158,125 @@ function matchWindow(n)
         } else {
             var step = stepSize * sign(distY);
         }
-        var blocked = scrollWithBlockCheck(distX, step);
+        var blocked = scrollWithBlockCheck(targetContainer, distX, step);
         var rest = Math.floor(distY / step) - 1;
         log("blocked?" + blocked + ", rest steps=" + rest);
         if (!blocked) {
-            cTimeout = setTimeout("matchWindow(" + rest + ")", stepInterval);
+            cTimeout = setTimeout(function () {
+                return matchWindow(linkId, targetId, rest);
+            }, stepInterval);
         } else {
+            clearTimeout(cTimeout);
             moving = false;
         }
     }
 }
 
 
+
 ////////////////////////// highlighting /////////////////////////////
 
+var highlighted = []
 function putHighlight(id, color) {
-    var elm = document.getElementById(id);
-    if (elm != null) {
+    var elm = $(id);
+    if (elm !== null) {
         elm.style.backgroundColor = color;
+        if (color !== bgColor) {
+            highlighted.push(id);
+        }
     }
 }
+
+
+function clearHighlight() {
+    for (i = 0; i < highlighted.length; i += 1) {
+        putHighlight(highlighted[i], bgColor);
+    }
+    highlighted = [];
+}
+
 
 
 /*
  * Highlight the link, target nodes and their lines,
  * then start animation to move the other window to match.
  */
-function highlight(linkId, targetId, linkLineId, targetLineId)
+function highlight(me, linkId, targetId, linkLineId, targetLineId, doMatch)
 {
-    putHighlight(matchId, bgColor);
-    putHighlight(matchLineId, bgColor);
+    if (me.id === 'left') {
+        matchId1 = linkId;
+        matchId2 = targetId;
+    } else {
+        matchId1 = targetId;
+        matchId2 = linkId;
+    }
+
+    clearHighlight();
+
     putHighlight(linkId, nodeHLColor);
+    putHighlight(targetId, nodeHLColor);
     putHighlight(linkLineId, lineHLColor);
+    putHighlight(targetLineId, lineHLColor);
 
-    matchId = linkId;
-    matchLineId = linkLineId;
-
-    with (otherside) {
-        putHighlight(matchId, bgColor);
-        putHighlight(matchLineId, bgColor);
-        putHighlight(targetId, nodeHLColor);
-        putHighlight(targetLineId, lineHLColor);
-
-        matchId = targetId;
-        matchLineId = targetLineId;
-
-        cTimeout = setTimeout("matchWindow(" + nSteps + ")" , stepInterval);
+    if (doMatch) {
+        matchWindow(linkId, targetId, nSteps);
     }
 }
 
 
-//////////////////////////// event handling ////////////////////////////
-/*
- * Making other side move instantly. Move other side only if:
- * - I am not in an animation initiated by the other side (moving)
- * - I do not have pending program-generated scroll events.
- *
- * Theoretically eventCount alone should work, but this is not the
- * case with Safari, so the 'moving' flag is necessary!
- */
-function instantMoveOtherWindow (e) {
-    log("moving=" + moving + ", eventCount=" + eventCount);
-    if (!moving && eventCount == 0) {
-        otherside.matchWindow(1);    
+function instantMoveOtherWindow (me) {
+    log("me=" + me.id + ", eventcount=" + eventCount[me.id]);
+    log("matchId1=" + matchId1 + ", matchId2=" + matchId2);
+
+    me.style.backgroundColor = bgColor;
+
+    if (!moving && eventCount[me.id] === 0) {
+        if (me.id === 'left') {
+            matchWindow(matchId1, matchId2, 1);
+        } else {
+            matchWindow(matchId2, matchId1, 1);
+        }
     }
-    if (eventCount > 0) {
-        eventCount--;
+    if (eventCount[me.id] > 0) {
+        eventCount[me.id] -= 1;
     }
-    log("eventCount change=" + eventCount);
 }
 
-// Scroll and Resize event handlers
-window.onscroll = instantMoveOtherWindow
-window.onresize = instantMoveOtherWindow
+
+function getTarget(x){
+    x = x || window.event;
+    return x.target || x.srcElement;
+}
+
+
+window.onload =
+    function (e) {
+        var tags = document.getElementsByTagName("A")
+        for (var i = 0; i < tags.length; i++) {
+            tags[i].onmouseover =
+                function (e) {
+                    var t = getTarget(e)
+                    var lid = t.id
+                    var tid = t.getAttribute('tid')
+                    var container = getContainer(t)
+                    highlight(container, lid, tid, 'ignore', 'ignore', false)
+                }
+            tags[i].onclick =
+                function (e) {
+                    var t = getTarget(e)
+                    var lid = t.id
+                    var tid = t.getAttribute('tid')
+                    var container = getContainer(t)
+                    highlight(container, lid, tid, 'ignore', 'ignore', true)
+                }
+        }
+
+        tags = document.getElementsByTagName("DIV")
+        for (var i = 0; i < tags.length; i++) {
+            tags[i].onscroll =
+                function (e) {
+                    instantMoveOtherWindow(getTarget(e))
+                }
+        }
+
+    }

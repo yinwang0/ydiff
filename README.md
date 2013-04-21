@@ -15,9 +15,9 @@ your PATH.
 
 1. Run commands like:
 
-        diff-scheme demos/mk.scm demos/mk-c.scm
+        diff-scheme demos/mk1.ss demos/mk2.ss
 
-   It will produce a HTML file named "mk-mk-c.html" in the current
+   It will produce a HTML file named "mk1-mk2.html" in the current
    directory.
 
 
@@ -28,9 +28,8 @@ your PATH.
 ### Caveats
 
 
-1. The HTML file needs the support files `diff-s.css` and `nav-div.js`
-   to be present in the same directory. You must copy those files
-   there.
+1. The HTML file needs the support files `nav.js` and `diff.css` to be
+   present in the same directory. You must copy those files there.
 
 
 2. Chrome and Opera will not execute JavaScript on local files, so you

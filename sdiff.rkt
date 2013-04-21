@@ -759,10 +759,10 @@
       (line port "<head>")
       (line port "<META http-equiv=\"Content-Type\""
                       " content=\"text/html; charset=utf-8\">")
-      (line port "<LINK href=\"diff-s.css\""
+      (line port "<LINK href=\"diff.css\""
                       " rel=\"stylesheet\" type=\"text/css\">")
       (line port "<script type=\"text/javascript\""
-                        " src=\"nav-div.js\"></script>")
+                        " src=\"nav.js\"></script>")
       (line port "</head>")
       (line port "<body>")))
 
