@@ -18,25 +18,26 @@
 
 .d {                            /* deleted */
     border: solid 1px #CC929A;
-    border-radius: 4px;
+    border-radius: 3px;
     background-color: #FCBFBA;
 }
 
 .i {                            /* inserted */
     border: solid 1px #73BE73;
-    border-radius: 4px;
+    border-radius: 3px;
     background-color: #98FB98;
 }
 
 .c {                            /* changed */
     border: solid 1px #8AADB8;
     background-color: LightBlue;
+    border-radius: 3px;
     cursor: pointer;
 }
 
 .m {                            /* moved */
-    border: dashed 1px #A9A9A9;
-    border-radius: 4px;
+    border: solid 1px #A9A9A9;
+    border-radius: 3px;
     cursor: crosshair;
 }
 

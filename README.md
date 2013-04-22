@@ -15,7 +15,7 @@ your PATH.
 
 1. Run commands like:
 
-        diff-scheme demos/mk1.ss demos/mk2.ss
+        ./diff-scheme demos/mk1.ss demos/mk2.ss
 
    It will produce a HTML file named "mk1-mk2.html" in the current
    directory.
@@ -52,7 +52,7 @@ Yin Wang (yinwang0@gmail.com)
 
 ### LICENSE
 
-Copyright (C) 2011 Yin Wang
+Copyright (C) 2011-2013 Yin Wang
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
