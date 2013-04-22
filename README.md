@@ -5,9 +5,12 @@ ydiff is implemented in Racket. You can get Racket from
     http://racket-lang.org
 
 To build ydiff, go to the directory containing the source and run
-"make". It should compile to several executables, such as
-"diff-scheme", "diff-cpp" etc. Copy those files to some directory in
-your PATH.
+
+    make
+
+It should compile to several executables, such as `diff-scheme`,
+`diff-cpp`, `diff-js` etc. Copy those files to some directory in your
+PATH.
 
 
 
