@@ -182,8 +182,8 @@
     (set! get-type fun)))
 
 
-;; same-def? only depend on get-name, so they need not be overridden
-;; by individual languages.
+;; same-def? and different-def? only depend on get-name, so they need
+;; not be overridden by individual languages.
 (define same-def?
   (lambda (e1 e2)
     (cond
@@ -198,6 +198,22 @@
 (define set-same-def
   (lambda (fun)
     (set! same-def? fun)))
+
+
+(define different-def?
+  (lambda (e1 e2)
+    (cond
+     [(not (eq? (get-type e1) (get-type e2)))
+      #f]
+     [else
+      (let ([name1 (get-name e1)]
+            [name2 (get-name e2)])
+        (and name1 name2 (not (equal? name1 name2))))])))
+
+
+(define set-different-def
+  (lambda (fun)
+    (set! different-def? fun)))
 
 
 
@@ -360,7 +376,8 @@
     (define try-extract
       (lambda (changes cost)
         (cond
-         [(not move?)
+         [(or (not move?)
+              (zero? cost))
           (memo changes cost)]
          [else
           (letv ([(m c) (diff-extract node1 node2 move?)])
@@ -447,7 +464,9 @@
                [(m1 c1) (diff-list1 table (cdr ls1) (cdr ls2) move?)]
                [cost1 (+ c0 c1)])
           (cond
-           [(same-def? (car ls1) (car ls2))
+           [(or (same-def? (car ls1) (car ls2))
+                (and (not (different-def? (car ls1) (car ls2)))
+                     (zero? c0)))
             (memo (append m0 m1) cost1)]
            [else
             (letv ([(m2 c2) (diff-list1 table (cdr ls1) ls2  move?)]
@@ -494,7 +513,8 @@
            [else
             (letv ([(m0 c0) (diff-node node1 (car elts2)  move?)])
               (cond
-               [(same-def? node1 (car elts2))
+               [(or (same-def? node1 (car elts2))
+                    (zero? c0))
                 (let ([frame (extract-frame node2 (car elts2) ins)])
                   (values (append m0 frame) c0))]
                [else
@@ -506,7 +526,8 @@
            [else
             (letv ([(m0 c0) (diff-node (car elts1) node2 move?)])
               (cond
-               [(same-def? (car elts1) node2)
+               [(or (same-def? (car elts1) node2)
+                    (zero? c0))
                 (let ([frame (extract-frame node1 (car elts1) del)])
                   (values (append m0 frame) c0))]
                [else
