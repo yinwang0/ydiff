@@ -27,17 +27,16 @@
 ;                      parameters
 ;-------------------------------------------------------------
 
-;; The ratio of cost/size that we consider two nodes to be
-;; "similar", so as to perform a heuristic move (that will
-;; cut running time by a lot.) But this number should be
-;; small enough otherwise everything will be considered to
-;; be moves! Set to a small number for accuracy.
+;; The ratio of cost/size that we consider two nodes to be "similar",
+;; so as to perform a heuristic move (that will cut running time by a
+;; lot.) But this number should be small enough otherwise everything
+;; will be considered to be moves! Set to a small number for accuracy.
 (define *move-ratio* 0)
 
 
-;; The minimum size of a node to be considered for moves.
-;; Shouldn't be too small, otherwise small deletec names
-;; will appear in a very distant place!
+;; The minimum size of a node to be considered for moves. Shouldn't be
+;; too small, otherwise small deleted names will appear in a very
+;; distant place!
 (define *move-size* 5)
 
 
@@ -801,8 +800,7 @@
 
 
 
-;; main command
-;; takes two file names and a parser
+;; main diff function
 (define diff
   (lambda (node1 node2 file1 file2)
     (cleanup)
