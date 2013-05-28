@@ -19,7 +19,7 @@
 
 (require "structs.rkt")
 (require "parse-cpp.rkt")
-(require "sdiff.rkt")
+(require "diff.rkt")
 (require "utils.rkt")
 
 

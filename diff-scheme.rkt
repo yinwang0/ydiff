@@ -2,7 +2,7 @@
 
 (require "structs.rkt")
 (require "parse-scheme.rkt")
-(require "sdiff.rkt")
+(require "diff.rkt")
 (require "utils.rkt")
 
 

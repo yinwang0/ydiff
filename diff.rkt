@@ -182,8 +182,8 @@
     (set! get-type fun)))
 
 
-;; same-def? and different-def? only depend on get-name, so they need
-;; not be overridden by individual languages.
+;; same-def? only depend on get-name, so they need not be overridden
+;; by individual languages.
 (define same-def?
   (lambda (e1 e2)
     (cond
@@ -198,22 +198,6 @@
 (define set-same-def
   (lambda (fun)
     (set! same-def? fun)))
-
-
-(define different-def?
-  (lambda (e1 e2)
-    (cond
-     [(not (eq? (get-type e1) (get-type e2)))
-      #f]
-     [else
-      (let ([name1 (get-name e1)]
-            [name2 (get-name e2)])
-        (and name1 name2 (not (equal? name1 name2))))])))
-
-
-(define set-different-def
-  (lambda (fun)
-    (set! different-def? fun)))
 
 
 
@@ -465,8 +449,7 @@
                [cost1 (+ c0 c1)])
           (cond
            [(or (same-def? (car ls1) (car ls2))
-                (and (not (different-def? (car ls1) (car ls2)))
-                     (zero? c0)))
+                (zero? c0))
             (memo (append m0 m1) cost1)]
            [else
             (letv ([(m2 c2) (diff-list1 table (cdr ls1) ls2  move?)]
