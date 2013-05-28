@@ -796,28 +796,18 @@
 
 (define htmlize
   (lambda (changes file1 file2 text1 text2)
-    (letv ([ctags1 (change-tags changes 'left)]
-           [ctags2 (change-tags changes 'right)]
-           [tagged1 (apply-tags text1 ctags1)]
-           [tagged2 (apply-tags text2 ctags2)]
-           [frame-file (string-append (base-name file1) "-"
-                                      (base-name file2) ".html")]
-           [port (open-output-file frame-file
+    (letv ([tags1 (change-tags changes 'left)]
+           [tags2 (change-tags changes 'right)]
+           [tagged-text1 (apply-tags text1 tags1)]
+           [tagged-text2 (apply-tags text2 tags2)]
+           [out-file (string-append (base-name file1) "-"
+                                    (base-name file2) ".html")]
+           [port (open-output-file out-file
                                    #:mode 'text
                                    #:exists 'replace)])
-
       (html-header port)
-      (write-html port tagged1 "left")
-      (write-html port tagged2 "right")
+      (write-html port tagged-text1 "left")
+      (write-html port tagged-text2 "right")
       (html-footer port)
       (close-output-port port))))
 
-
-
-;;; for command line use only
-
-;; (let ([node1 (decode-ast (read))]
-;;       [node2 (decode-ast (read))]
-;;       [file1 (symbol->string (read))]
-;;       [file2 (symbol->string (read))])
-;;   (diff node1 node2 file1 file2))
