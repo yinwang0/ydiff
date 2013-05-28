@@ -59,11 +59,12 @@
 ;; function interface
 (define diff-scheme
   (lambda (file1 file2)
-    (let* ([s1 (read-file file1)]
-           [s2 (read-file file2)]
-           [node1 (parse-scheme s1)]
-           [node2 (parse-scheme s2)])
-      (diff node1 node2 file1 file2))))
+    (let* ([text1 (read-file file1)]
+           [text2 (read-file file2)]
+           [node1 (parse-scheme text1)]
+           [node2 (parse-scheme text2)]
+           [changes (diff node1 node2)])
+      (htmlize changes file1 file2 text1 text2))))
 
 ;; (diff-scheme "demos/mk1.ss" "demos/mk2.ss")
 

@@ -779,36 +779,38 @@
 
 
 ;; main diff function
+;; returns all changes after diffing and moving
 (define diff
-  (lambda (node1 node2 file1 file2)
-    (cleanup)
+  (lambda (node1 node2)
     (letv ([start (current-seconds)]
-           [s1 (read-file file1)]
-           [s2 (read-file file2)]
-           [_ (diff-progress "\nDone parsing")]
-           [(changes cost) (diff-node node1 node2 #f)]
+           [(changes _) (diff-node node1 node2 #f)]
            [_ (diff-progress "\nDone diffing")]
            [changes (closure changes)]
            [_ (diff-progress "\nDone moving")]
-           [_ (set! *diff-hash* (make-hasheq))]
-           [ctags1 (change-tags changes 'left)]
+           [end (current-seconds)])
+      (printf "finished in ~a seconds~n" (- end start))
+      (cleanup)
+      changes)))
+
+
+
+(define htmlize
+  (lambda (changes file1 file2 text1 text2)
+    (letv ([ctags1 (change-tags changes 'left)]
            [ctags2 (change-tags changes 'right)]
-           [tagged1 (apply-tags s1 ctags1)]
-           [tagged2 (apply-tags s2 ctags2)]
+           [tagged1 (apply-tags text1 ctags1)]
+           [tagged2 (apply-tags text2 ctags2)]
            [frame-file (string-append (base-name file1) "-"
                                       (base-name file2) ".html")]
            [port (open-output-file frame-file
                                    #:mode 'text
-                                   #:exists 'replace)]
-           [end (current-seconds)])
-      (printf "finished in ~a seconds~n" (- end start))
+                                   #:exists 'replace)])
 
       (html-header port)
       (write-html port tagged1 "left")
       (write-html port tagged2 "right")
       (html-footer port)
-      (close-output-port port)
-      (cleanup))))
+      (close-output-port port))))
 
 
 

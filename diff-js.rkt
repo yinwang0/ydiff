@@ -50,8 +50,9 @@
 (let* ([args (current-command-line-arguments)]
        [file1 (vector-ref args 0)]
        [file2 (vector-ref args 1)]
-       [s1 (read-file file1)]
-       [s2 (read-file file2)]
-       [node1 (parse-js s1)]
-       [node2 (parse-js s2)])
-  (diff node1 node2 file1 file2))
+       [text1 (read-file file1)]
+       [text2 (read-file file2)]
+       [node1 (parse-js text1)]
+       [node2 (parse-js text2)]
+       [changes (diff node1 node2)])
+  (htmlize changes file1 file2 text1 text2))
