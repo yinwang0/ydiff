@@ -30,12 +30,13 @@
 ;; The ratio of cost/size that we consider two nodes to be "similar",
 ;; so as to perform a heuristic move (that will cut running time by a
 ;; lot.) But this number should be small enough otherwise everything
-;; will be considered to be moves! Set to a small number for accuracy.
+;; will be considered to be moves! Set to a small number for accuracy
+;; and large number for speed.
 (define *move-ratio* 0)
 
 
-;; The minimum size of a node to be considered for moves. Shouldn't be
-;; too small, otherwise small deleted names will appear in a very
+;; The minimum size of a node to be considered as moved. Shouldn't be
+;; too small, otherwise small deleted names may appear in a very
 ;; distant place!
 (define *move-size* 5)
 
@@ -61,7 +62,14 @@
 ;                      data types
 ;-------------------------------------------------------------
 
-(struct Change (orig cur cost type) #:transparent)
+;; Change - a change in the data structure
+;; - old  : the old version, #f for insertions
+;; - new  : the new version, #f for deletions
+;; - cost : the cost of change from old to new
+;; - type : insertion, deletion, or modification?
+(struct Change (old new cost type) #:transparent)
+
+;; HTML tag structure used HTML generation code
 (struct Tag (tag idx start) #:transparent)
 
 (define ins?
@@ -101,7 +109,8 @@
     (list (Change node1 node2 cost 'mov))))
 
 
-;; create a "total change". (delete node1 and insert node2)
+;; create a "total change"
+;; (delete node1 completely and then insert node2)
 (define total
   (lambda (node1 node2)
     (let ([size1 (node-size node1)]
@@ -110,6 +119,7 @@
               (+ size1 size2)))))
 
 
+;; temporary workaround before the algorithm stablizes
 (define mod->mov
   (lambda (c)
     (match c
@@ -133,10 +143,10 @@
     (cond
      [(ins? change)
       (apply append
-             (map ins (deframe (Change-cur change))))]
+             (map ins (deframe (Change-new change))))]
      [(del? change)
       (apply append
-             (map del (deframe (Change-orig change))))]
+             (map del (deframe (Change-old change))))]
      [else (list change)])))
 
 
@@ -148,7 +158,7 @@
                                    (not (eq? x node2)))
                                  elts1)])
          (type (Node 'frame start1 start1 frame-elts)))]
-      [_ fatal 'extract-frame "I only accept Expr"])))
+      [_ fatal 'extract-frame "I only accept Node"])))
 
 
 ;; (define n1 (Token "ok" 0 1))
@@ -165,6 +175,7 @@
 ;; "virtual function" - get definition name
 ;; can be overridden by individual languages
 (define get-name (lambda (node) #f))
+
 (define set-get-name
   (lambda (fun)
     (set! get-name fun)))
@@ -279,8 +290,8 @@
 ;; similarity string from a change
 (define similarity
   (lambda (change)
-    (let ([total (+ (node-size (Change-orig change))
-                    (node-size (Change-cur change)))])
+    (let ([total (+ (node-size (Change-old change))
+                    (node-size (Change-new change)))])
       (cond
        [(or (= 0 total) (= 0 (Change-cost change)))
         "100%"]
@@ -445,7 +456,7 @@
 
 
 
-;; global 2D hash for storing known diffs
+;; global 2-D hash for storing known diffs
 (define *diff-hash* (make-hasheq))
 
 (define diff-list
@@ -556,12 +567,12 @@
   (lambda (c)
     (cond
      [(ins? c)
-      (big-node? (Change-cur c))]
+      (big-node? (Change-new c))]
      [(del? c)
-      (big-node? (Change-orig c))]
+      (big-node? (Change-old c))]
      [(mod? c)
-      (or (big-node? (Change-orig c))
-          (big-node? (Change-cur c)))])))
+      (or (big-node? (Change-old c))
+          (big-node? (Change-new c)))])))
 
 
 (define node-sort-fn
@@ -588,8 +599,8 @@
       (letv ([dels (filter (predand del? big-change?) changes)]
              [adds (filter (predand ins? big-change?) changes)]
              [rest (set- changes (append dels adds))]
-             [ls1 (sort (map Change-orig dels) node-sort-fn)]
-             [ls2 (sort (map Change-cur adds) node-sort-fn)]
+             [ls1 (sort (map Change-old dels) node-sort-fn)]
+             [ls2 (sort (map Change-new adds) node-sort-fn)]
              [(m c) (diff-list ls1 ls2 #t)]
              [new-moves (map mod->mov (filter mod? m))])
         (printf "~n~a new moves found" (length new-moves))
@@ -634,13 +645,13 @@
        [(null? cs) tags]
        [else
         (let ([key (if (eq? side 'left)
-                       (Change-orig (car cs))
-                       (Change-cur (car cs)))])
+                       (Change-old (car cs))
+                       (Change-new (car cs)))])
           (cond
            [(or (not key)
                 (= (Node-start key) (Node-end key)))
             (loop (cdr cs) tags)]
-           [(and (Change-orig (car cs)) (Change-cur (car cs)))
+           [(and (Change-old (car cs)) (Change-new (car cs)))
             (let ([startTag (Tag (link-start (car cs) side)
                                  (Node-start key) -1)]
                   [endTag (Tag "</a>" (Node-end key) (Node-start key))])
@@ -689,11 +700,11 @@
   (lambda (change side)
     (let ([cls (change-class change)]
           [me (if (eq? side 'left)
-                  (Change-orig change)
-                  (Change-cur change))]
+                  (Change-old change)
+                  (Change-new change))]
           [other (if (eq? side 'left)
-                     (Change-cur change)
-                     (Change-orig change))])
+                     (Change-new change)
+                     (Change-old change))])
       (string-append
        "<a id="  (qs (uid me))
        " tid="   (qs (uid other))
