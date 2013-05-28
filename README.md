@@ -1,3 +1,14 @@
+### STATUS OF PARSERS
+
+Please keep in mind that this is an experimental project although some
+techniques used here may have interesting innovations. Parsers are not
+the focus of this project. The C++ and JavaScript parsers in this
+project is experimental and not made for serious uses. More work is
+needed to make those parsers able to handle complete languages, but
+this is not my currently priority.
+
+
+
 ### INSTALLATION
 
 ydiff is implemented in Racket. You can get Racket from
@@ -35,17 +46,6 @@ PATH.
    present in the same directory. You must copy those files to the
    directory where you ran the commands. This is not a good user
    experience design and may be improved later.
-
-
-2. Chrome and Opera will not execute JavaScript on local files, so you
-   may need to install a web server on your machine to view the file
-   correctly. I recommend
-   [mongoose](http://code.google.com/p/mongoose). Just put the
-   executable in your directory and run it, then visit
-   "localhost:8080".
-
-   Other browsers (Safari, Firefox, IE) hasn't this issue and can
-   directly open the file.
 
 
 
