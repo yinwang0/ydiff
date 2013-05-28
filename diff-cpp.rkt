@@ -41,11 +41,6 @@
 ;;            (car (parse1 $statement "int f(int x) {}")))
 
 
-;; (different-def? (car (parse1 $statement "int f(int x) {}"))
-;;                 (car (parse1 $statement "int g(int x) {}")))
-
-
-
 ;; command line interface
 (let* ([args (current-command-line-arguments)]
        [file1 (vector-ref args 0)]
@@ -61,4 +56,3 @@
 ;---------------------------------------------
 ; (diff-cpp "tests/simulator-mips.cc" "tests/simulator-arm.cc")
 ; (diff-cpp "tests/d8-3404.cc" "tests/d8-8424.cc")
-

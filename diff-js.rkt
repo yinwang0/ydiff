@@ -41,11 +41,6 @@
 ;;            (car (parse1 $statement "function f(x) {}")))
 
 
-;; (different-def? (car (parse1 $statement "function f(x) {}"))
-;;                 (car (parse1 $statement "function g(x) {}")))
-
-
-
 ;; command line interface
 (let* ([args (current-command-line-arguments)]
        [file1 (vector-ref args 0)]
