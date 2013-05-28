@@ -27,14 +27,6 @@
 ;                      parameters
 ;-------------------------------------------------------------
 
-;; The ratio of cost/size that we consider two nodes to be "similar",
-;; so as to perform a heuristic move (that will cut running time by a
-;; lot.) But this number should be small enough otherwise everything
-;; will be considered to be moves! Set to a small number for accuracy
-;; and large number for speed.
-(define *move-ratio* 0)
-
-
 ;; The minimum size of a node to be considered as moved. Shouldn't be
 ;; too small, otherwise small deleted names may appear in a very
 ;; distant place!
@@ -225,14 +217,6 @@
 
 
 
-;; whether two nodes are similar given the cost
-(define similar?
-  (lambda (node1 node2 c)
-    (<= c (* *move-ratio* (+ (node-size node1)
-                             (node-size node2))))))
-
-
-
 ;----------- node size function ------------
 (define *node-size-hash* (make-hasheq))
 
@@ -392,8 +376,7 @@
     (define try-extract
       (lambda (changes cost)
         (cond
-         [(or (not move?)
-              (similar? node1 node2 cost))
+         [(not move?)
           (memo changes cost)]
          [else
           (letv ([(m c) (diff-extract node1 node2 move?)])
@@ -480,9 +463,7 @@
                [(m1 c1) (diff-list1 table (cdr ls1) (cdr ls2) move?)]
                [cost1 (+ c0 c1)])
           (cond
-           [(or (same-def? (car ls1) (car ls2))
-                (and (not (different-def? (car ls1) (car ls2)))
-                     (similar? (car ls1) (car ls2) c0)))
+           [(same-def? (car ls1) (car ls2))
             (memo (append m0 m1) cost1)]
            [else
             (letv ([(m2 c2) (diff-list1 table (cdr ls1) ls2  move?)]
@@ -529,8 +510,7 @@
            [else
             (letv ([(m0 c0) (diff-node node1 (car elts2)  move?)])
               (cond
-               [(or (same-def? node1 (car elts2))
-                    (similar? node1 (car elts2) c0))
+               [(same-def? node1 (car elts2))
                 (let ([frame (extract-frame node2 (car elts2) ins)])
                   (values (append m0 frame) c0))]
                [else
@@ -542,8 +522,7 @@
            [else
             (letv ([(m0 c0) (diff-node (car elts1) node2 move?)])
               (cond
-               [(or (same-def? (car elts1) node2)
-                    (similar? (car elts1) node2 c0))
+               [(same-def? (car elts1) node2)
                 (let ([frame (extract-frame node1 (car elts1) del)])
                   (values (append m0 frame) c0))]
                [else
