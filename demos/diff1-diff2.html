@@ -1,0 +1,1861 @@
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=utf-8">
+<LINK href="diff.css" rel="stylesheet" type="text/css">
+<script type="text/javascript" src="nav.js"></script>
+</head>
+<body>
+<div id="left" class="src">
+<pre>
+<a id='leftstart' tid='rightstart'></a>
+<span class='d'>;; yDiff - a language-aware tool for comparing programs
+</span><a id='1901' tid='1902' class='u'>;; Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
+</a>
+
+<a id='1903' tid='1904' class='u'>;; This program is free software: you can redistribute it and/or modify
+</a><a id='1905' tid='1906' class='u'>;; it under the terms of the GNU General Public License as published by
+</a><a id='1907' tid='1908' class='u'>;; the Free Software Foundation, either version 3 of the License, or
+</a><a id='1909' tid='1910' class='u'>;; (at your option) any later version.
+</a>
+<a id='1911' tid='1912' class='u'>;; This program is distributed in the hope that it will be useful,
+</a><a id='1913' tid='1914' class='u'>;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+</a><a id='1915' tid='1916' class='u'>;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+</a><a id='1917' tid='1918' class='u'>;; GNU General Public License for more details.
+</a>
+<a id='1919' tid='1920' class='u'>;; You should have received a copy of the GNU General Public License
+</a><a id='1921' tid='1922' class='u'>;; along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.
+</a>
+
+
+<span class='d'>(load &quot;utils.ss&quot;)</span>
+
+
+
+<span class='d'>;-------------------------------------------------------------
+</span><span class='d'>;                      parameters
+</span><span class='d'>;-------------------------------------------------------------
+</span>
+<span class='d'>;; The ratio of cost/size that we consider two nodes to be
+</span><span class='d'>;; &quot;similar&quot;, so as to perform a heuristic move (that will
+</span><span class='d'>;; cut running time by a lot.) But this number should be
+</span><span class='d'>;; small enough otherwise everything will be considered to
+</span><span class='d'>;; be moves! Set to a small number for accuracy.
+</span><span class='d'>(define *move-ratio* 0)</span>
+
+
+<span class='d'>;; The minimum size of a node to be considered for moves.
+</span><span class='d'>;; Shouldn&#39;t be too small, otherwise small deletec names
+</span><span class='d'>;; will appear in a very distant place! This number should
+</span><span class='d'>;; be larger than *min-frame-size* otherwise it will not be
+</span><span class='d'>;; effective because substructural diff will do it.
+</span>(<a id='809' tid='810' class='u'>define</a> <a id='811' tid='812' class='u'>*move-size*</a> <a id='813' tid='814' class='u'>5</a>)
+
+
+<span class='d'>;; The depth limit for detecting substructural moves. If
+</span><span class='d'>;; this is set, we will ignore nodes that are deeper than
+</span><span class='d'>;; this number. The minimum is 7 to be useful.
+</span><span class='d'>(define *move-depth* 5)</span>
+
+<span class='d'>;; How many iterations do we go for moves? This parameter
+</span><span class='d'>;; should be large enough so that we can discover enough
+</span><span class='d'>;; moves. The algorithm is guaranteed to terminate, but it
+</span><span class='d'>;; should be be set to some small number if we found that it
+</span><span class='d'>;; takes too much time to terminate. This value should be
+</span><span class='d'>;; larger than 7 in order to work for normal programs.
+</span><span class='d'>(define *move-iteration* 1000)</span>
+
+
+<span class='d'>;; How large must a node be considered as container for
+</span><span class='d'>;; another node? If this is set to a big number, we will
+</span><span class='d'>;; ignore nodes that are smaller than the number. This
+</span><span class='d'>;; number shouldn&#39;t be too small, otherwise too many
+</span><span class='d'>;; spurious moves will be detected! For example, a deleted
+</span><span class='d'>;; &quot;int&quot; could be moved to a very far place! Setting it to a
+</span><span class='d'>;; bigger number also reduces running time (by a great
+</span><span class='d'>;; amount) because less substructural moves are considered.
+</span><span class='d'>;; Set it to a larger number will cause loss of
+</span><span class='d'>;; substructural changes, but greatly reduces time to run.
+</span><span class='d'>(define *min-frame-size* 3)</span>
+
+
+<span class='d'>;; How deep must the frames be for us to consider them as
+</span><span class='d'>;; moves? This affects only already extracted frames, which
+</span><span class='d'>;; may be considered to be moves to other extracted frames.
+</span><span class='d'>;; Set it large will not necessarily lower accuracy, but
+</span><span class='d'>;; improves performance.
+</span><span class='d'>(define *min-frame-depth* 2)</span>
+
+
+<span class='d'>;; How long must a string be in order for us to use
+</span><span class='d'>;; string-dist function, which is costly when used on long
+</span><span class='d'>;; strings but the most accurate method to use. This
+</span><span class='d'>;; parameter affects strings/comments only. We use
+</span><span class='d'>;; string-dist for all Tokens.
+</span>(<a id='799' tid='800' class='u'>define</a> <a id='801' tid='802' class='u'>*max-string-len*</a> <span class='d'>200</span>)
+
+
+<span class='d'>;; only memoize the diff of nodes of size larger than this
+</span><span class='d'>;; number
+</span>(<a id='803' tid='804' class='u'>define</a> <a id='805' tid='806' class='u'>*memo-node-size*</a> <a id='807' tid='808' class='u'>2</a>)
+
+
+
+<span class='d'>(define *keywords* &#39;())</span>
+<span class='d'>(define *keyword-exchange* &#39;())</span>
+<span class='d'>(define *defs* &#39;())</span>
+
+
+
+<span class='d'>;-------------------------------------------------------------
+</span><span class='d'>;                      utilities
+</span><span class='d'>;-------------------------------------------------------------
+</span>
+(<a id='1551' tid='1552' class='u'>define</a> <a id='1553' tid='1554' class='u'>qs</a>
+  <span class='d'>(lambda (x)
+    (string-append &quot;&#39;&quot; (number-&gt;string x) &quot;&#39;&quot;))</span>)
+
+
+(<a id='1403' tid='1404' class='u'>define</a> <a id='1405' tid='1406' class='u'>line</a>
+  (<a id='1407' tid='1408' class='u'>lambda</a> (<a id='1409' tid='1410' class='u'>port</a> <a id='1411' tid='1412' class='u'>.</a> <a id='1413' tid='1414' class='u'>s</a>)
+    (<a id='1415' tid='1416' class='u'>display</a> (<a id='1417' tid='1418' class='u'>string-append</a> (<a id='1419' tid='1420' class='u'>apply</a> <a id='1421' tid='1422' class='u'>string-append</a> <a id='1423' tid='1424' class='u'>s</a>) <a id='1425' tid='1426' class='u'>&quot;\n&quot;</a>) <a id='1427' tid='1428' class='u'>port</a>)))
+
+
+
+<span class='d'>;-------------------------------------------------------------
+</span><span class='d'>;                      data types
+</span><span class='d'>;-------------------------------------------------------------
+</span>
+<span class='d'>(struct Change (orig cur cost type) #:transparent)</span>
+(<a id='1923' tid='1924' class='u'>struct</a> <a id='1925' tid='1926' class='u'>Tag</a> (<a id='1927' tid='1928' class='u'>tag</a> <a id='1929' tid='1930' class='u'>idx</a> <a id='1931' tid='1932' class='u'>start</a>) <a id='1933' tid='1934' class='u'>#:transparent</a>)
+
+
+(<a id='1399' tid='1400' class='u'>define</a> <a id='1401' tid='1402' class='u'>ins?</a>
+  <span class='d'>(lambda (c)
+    (not (Change-orig c)))</span>)
+
+(<a id='1107' tid='1108' class='u'>define</a> <a id='1109' tid='1110' class='u'>del?</a>
+  <span class='d'>(lambda (c)
+    (not (Change-cur c)))</span>)
+
+(<a id='1535' tid='1536' class='u'>define</a> <a id='1537' tid='1538' class='u'>mod?</a>
+  <span class='d'>(lambda (c)
+    (and (Change-orig c) (Change-cur c)))</span>)
+
+
+
+<a id='1935' tid='1936' class='u'>;----------------- utils for creating changes ----------------
+</a>(<a id='1747' tid='1748' class='u'>define</a> <a id='1749' tid='1750' class='u'>total</a>
+  (<a id='495' tid='496' class='m'>lambda</a> (<a id='497' tid='498' class='m'>node1</a> <a id='499' tid='500' class='m'>node2</a>)
+    (<span class='d'>let</span> ([<a id='501' tid='502' class='m'>size1</a> (<a id='503' tid='504' class='m'>node-size</a> <a id='505' tid='506' class='m'>node1</a>)]
+          [<a id='507' tid='508' class='m'>size2</a> (<a id='509' tid='510' class='m'>node-size</a> <a id='511' tid='512' class='m'>node2</a>)])
+      <span class='d'>(values (append (del-node node1) (ins-node node2))
+              (+ size1 size2))</span>)))
+
+(<span class='d'>define</span> <span class='d'>del-node</span>
+  (<a id='389' tid='390' class='m'>lambda</a> (<a id='391' tid='392' class='m'>node</a>)
+    (<a id='393' tid='394' class='m'>let</a> ([<a id='395' tid='396' class='m'>size</a> (<a id='397' tid='398' class='m'>node-size</a> <a id='399' tid='400' class='m'>node</a>)])
+      (<a id='401' tid='402' class='m'>list</a> (<a id='403' tid='404' class='m'>Change</a> <a id='405' tid='406' class='m'>node</a> <a id='407' tid='408' class='m'>#f</a> <a id='409' tid='410' class='m'>size</a> <a id='411' tid='412' class='m'>&#39;</a><a id='413' tid='414' class='m'>del</a>)))))
+
+(<span class='d'>define</span> <span class='d'>ins-node</span>
+  (<a id='425' tid='426' class='m'>lambda</a> (<a id='427' tid='428' class='m'>node</a>)
+    (<a id='429' tid='430' class='m'>let</a> ([<a id='431' tid='432' class='m'>size</a> (<a id='433' tid='434' class='m'>node-size</a> <a id='435' tid='436' class='m'>node</a>)])
+      (<a id='437' tid='438' class='m'>list</a> (<a id='439' tid='440' class='m'>Change</a> <a id='441' tid='442' class='m'>#f</a> <a id='443' tid='444' class='m'>node</a> <a id='445' tid='446' class='m'>size</a> <a id='447' tid='448' class='m'>&#39;</a><a id='449' tid='450' class='m'>ins</a>)))))
+
+
+
+<span class='d'>(define disassemble-frame
+  (lambda (node)
+    (cond
+     [(and (Expr? node) (eq? &#39;frame (Expr-type node)))
+      (apply append (map disassemble-frame (Expr-elts node)))]
+     [else (list node)])))</span>
+
+
+<span class='d'>(define disassemble-change
+  (lambda (change)
+    (cond
+     [(ins? change)
+      (apply append
+             (map ins-node
+                  (disassemble-frame (Change-cur change))))]
+     [(del? change)
+      (apply append
+             (map del-node
+                  (disassemble-frame (Change-orig change))))]
+     [else (list change)])))</span>
+
+
+(<a id='1371' tid='1372' class='u'>define</a> <a id='1373' tid='1374' class='u'>extract-frame</a>
+  (<span class='d'>lambda</span> <span class='d'>(node1 node2)</span>
+    (<span class='d'>match</span> <span class='d'>node1</span>
+      [<span class='d'>(Expr type1 elts1 start1 end1)</span>
+       (<span class='d'>let</span> ([<a id='513' tid='514' class='m'>frame-elts</a> (<a id='515' tid='516' class='m'>filter</a> (<a id='517' tid='518' class='m'>lambda</a> (<a id='519' tid='520' class='m'>x</a>)
+                                   (<a id='521' tid='522' class='m'>not</a> (<a id='523' tid='524' class='m'>eq?</a> <a id='525' tid='526' class='m'>x</a> <a id='527' tid='528' class='m'>node2</a>)))
+                                 <a id='529' tid='530' class='m'>elts1</a>)])
+         <span class='d'>(Expr &#39;frame frame-elts start1 start1)</span>)]
+      <span class='d'>[_ fatal &#39;extract-frame &quot;I only accept Expr&quot;]</span>)))
+
+
+
+<span class='d'>(define extract-ins-frame
+  (lambda (node1 node2)
+    (let ([frame (extract-frame node1 node2)])
+      (cond
+       [(not frame) &#39;()]
+       [else
+        (ins-node frame)]))))</span>
+
+
+
+<span class='d'>(define extract-del-frame
+  (lambda (node1 node2)
+    (let ([frame (extract-frame node1 node2)])
+      (cond
+       [(not frame) &#39;()]
+       [else
+        (del-node frame)]))))</span>
+
+
+
+<span class='d'>;; (define n1 (Token &quot;ok&quot; 0 1))
+</span>
+<span class='d'>;; (define n2 (Expr &#39;ok (list n1 (Token &quot;bar&quot; 1 2)) 0 2))
+</span>
+<span class='d'>;; (map disassemble-change (extract-ins-frame n2 n1))
+</span>
+
+
+
+<span class='d'>(define ins-node-except
+  (lambda (node1 node2)
+    (let ([nodes (map (lambda (x)
+                        (if (not (eq? x node2))
+                            (ins-node x)
+                            &#39;()))
+                      (Expr-elts node1))])
+      (apply append nodes))))</span>
+
+
+<span class='d'>(define del-node-except
+  (lambda (node1 node2)
+    (let ([nodes (map (lambda (x)
+                        (if (not (eq? x node2))
+                            (del-node x)
+                            &#39;()))
+                      (Expr-elts node1))])
+      (apply append nodes))))</span>
+
+
+
+(<span class='d'>define</span> <span class='d'>mod-node</span>
+  (<a id='451' tid='452' class='m'>lambda</a> (<a id='453' tid='454' class='m'>node1</a> <a id='455' tid='456' class='m'>node2</a> <a id='457' tid='458' class='m'>cost</a>)
+    (<a id='459' tid='460' class='m'>list</a> (<a id='461' tid='462' class='m'>Change</a> <a id='463' tid='464' class='m'>node1</a> <a id='465' tid='466' class='m'>node2</a> <a id='467' tid='468' class='m'>cost</a> <a id='469' tid='470' class='m'>&#39;</a><a id='471' tid='472' class='m'>mod</a>))))
+
+(<span class='d'>define</span> <span class='d'>mov-node</span>
+  (<a id='473' tid='474' class='m'>lambda</a> (<a id='475' tid='476' class='m'>node1</a> <a id='477' tid='478' class='m'>node2</a> <a id='479' tid='480' class='m'>cost</a>)
+    (<a id='481' tid='482' class='m'>list</a> (<a id='483' tid='484' class='m'>Change</a> <a id='485' tid='486' class='m'>node1</a> <a id='487' tid='488' class='m'>node2</a> <a id='489' tid='490' class='m'>cost</a> <a id='491' tid='492' class='m'>&#39;</a><a id='493' tid='494' class='m'>mov</a>))))
+
+(<a id='1495' tid='1496' class='u'>define</a> <a id='1497' tid='1498' class='u'>mod-&gt;mov</a>
+  (<a id='1499' tid='1500' class='u'>lambda</a> (<a id='1501' tid='1502' class='u'>c</a>)
+    (<a id='1503' tid='1504' class='u'>match</a> <a id='1505' tid='1506' class='u'>c</a>
+     [(<a id='1507' tid='1508' class='u'>Change</a> <a id='1509' tid='1510' class='u'>node1</a> <a id='1511' tid='1512' class='u'>node2</a> <a id='1513' tid='1514' class='u'>cost</a> <a id='1515' tid='1516' class='u'>&#39;</a><a id='1517' tid='1518' class='u'>mod</a>)
+      (<a id='1519' tid='1520' class='u'>Change</a> <a id='1521' tid='1522' class='u'>node1</a> <a id='1523' tid='1524' class='u'>node2</a> <a id='1525' tid='1526' class='u'>cost</a> <a id='1527' tid='1528' class='u'>&#39;</a><a id='1529' tid='1530' class='u'>mov</a>)]
+     [<a id='1531' tid='1532' class='u'>other</a> <a id='1533' tid='1534' class='u'>other</a>])))
+
+
+
+
+<span class='d'>;------------------ operations on nodes ---------------------
+</span>
+(<span class='d'>define</span> <span class='d'>node-equal?</span>
+  (<span class='d'>lambda</span> <span class='d'>(node1 node2)</span>
+    (<span class='d'>cond</span>
+     <span class='d'>[(and (null? node1) (null? node2)) #t]</span>
+     <span class='d'>[(and (Str? node1) (Str? node2))
+      (and (equal? (Str-s node1) (Str-s node2)))]</span>
+     <span class='d'>[(and (Comment? node1) (Comment? node2))
+      (and (equal? (Comment-text node1) (Comment-text node2)))]</span>
+     <span class='d'>[(and (Char? node1) (Char? node2))
+      (and (equal? (Char-c node1) (Char-c node2)))]</span>
+     <span class='d'>[(and (Token? node1) (Token? node2))
+      (and (equal? (Token-text node1)
+                   (Token-text node2)))]</span>
+     <span class='d'>[(and (Expr? node1) (Expr? node2))
+      (and (eq? (Expr-type node1)
+                (Expr-type node2))
+           (node-equal? (Expr-elts node1)
+                        (Expr-elts node2)))]</span>
+     [(<a id='81' tid='82' class='m'>and</a> (<a id='83' tid='84' class='m'>pair?</a> <a id='85' tid='86' class='m'>node1</a>) (<a id='87' tid='88' class='m'>pair?</a> <a id='89' tid='90' class='m'>node2</a>))
+      <span class='d'>(and (node-equal? (car node1) (car node2))
+           (node-equal? (cdr node1) (cdr node2)))</span>]
+     <span class='d'>[else #f]</span>)))
+
+
+
+<span class='d'>(define keyword-exchangeable?
+  (lambda (k1 k2)
+    (cond
+     [(eq? k1 k2) #t]
+     [(assq k1 *keyword-exchange*)
+      =&gt; (lambda (p)
+           (cond
+            [(memq k2 (cdr p)) #t]
+            [else #f]))]
+     [else #f])))</span>
+
+
+
+<span class='d'>(define keywords-equal?
+  (lambda (node1 node2)
+    (and (eq? (Expr-type node1)
+              (Expr-type node2))
+         (not (keywords-differ? node1 node2)))))</span>
+
+
+
+<span class='d'>(define keywords-differ?
+  (lambda (exp1 exp2)
+    (let ([key1 (and (not (null? (Expr-elts exp1)))
+                     (get-symbol (car (Expr-elts exp1))))]
+          [key2 (and (not (null? (Expr-elts exp2)))
+                     (get-symbol (car (Expr-elts exp2))))])
+      (cond
+       [(and key1 key2
+             (or (memq key1 *keywords*)
+                 (memq key2 *keywords*))
+             (not (keyword-exchangeable? key1 key2)))
+        #t]
+       [else #f]))))</span>
+
+
+
+<span class='d'>(define get-symbol
+  (lambda (node)
+    (cond
+     [(Token? node)
+      (string-&gt;symbol (Token-text node))]
+     [else #f])))</span>
+
+
+
+(<a id='1555' tid='1556' class='u'>define</a> <a id='1557' tid='1558' class='u'>same-def?</a>
+  <span class='d'>(lambda (e1 e2)
+    (cond
+      [(and (Expr? e1) (Expr? e2))
+       (let ([elts1 (Expr-elts e1)]
+             [elts2 (Expr-elts e2)])
+         (cond
+          [(and (&gt; (length elts1) 1)
+                (&gt; (length elts2) 1)
+                (memq (get-symbol (car elts1)) *defs*)
+                (memq (get-symbol (car elts2)) *defs*))
+           (eq? (get-symbol (cadr elts1))
+                (get-symbol (cadr elts2)))]
+          [else #f]))]
+      [else #f]))</span>)
+
+<span class='d'>;; (same-def? (car (parse-scheme &quot;(define f 1)&quot;))
+</span><span class='d'>;;            (car (parse-scheme &quot;(define g 1)&quot;)))
+</span>
+
+
+<span class='d'>(define different-def?
+  (lambda (e1 e2)
+    (cond
+      [(and (Expr? e1) (Expr? e2))
+       (let ([elts1 (Expr-elts e1)]
+             [elts2 (Expr-elts e2)])
+         (cond
+          [(and (&gt; (length elts1) 1)
+                (&gt; (length elts2) 1)
+                (memq (get-symbol (car elts1)) *defs*)
+                (memq (get-symbol (car elts2)) *defs*))
+           (not (eq? (get-symbol (cadr elts1))
+                     (get-symbol (cadr elts2))))]
+          [else #f]))]
+      [else #f])))</span>
+
+<span class='d'>;; (different-def? (car (parse-scheme &quot;(define f 1)&quot;))
+</span><span class='d'>;;                 (car (parse-scheme &quot;(let f 1)&quot;)))
+</span>
+
+
+<span class='d'>;; whether two nodes are similar given the cost
+</span><span class='d'>(define similar?
+  (lambda (node1 node2 c)
+    (&lt;= c (* *move-ratio* (+ (node-size node1)
+                             (node-size node2))))))</span>
+
+
+(<a id='815' tid='816' class='u'>define</a> <a id='817' tid='818' class='u'>*node-size-hash*</a> (<a id='819' tid='820' class='u'>make-hasheq</a>))
+
+(<a id='1543' tid='1544' class='u'>define</a> <a id='1545' tid='1546' class='u'>node-size</a>
+  (<a id='559' tid='560' class='m'>lambda</a> (<a id='561' tid='562' class='m'>node</a>)
+    (<a id='531' tid='532' class='m'>define</a> <a id='533' tid='534' class='m'>memo</a>
+      (<a id='535' tid='536' class='m'>lambda</a> (<a id='537' tid='538' class='m'>v</a>)
+        (<a id='539' tid='540' class='m'>if</a> (<a id='541' tid='542' class='m'>&gt;</a> <a id='543' tid='544' class='m'>v</a> <a id='545' tid='546' class='m'>1</a>)
+            (<a id='547' tid='548' class='m'>hash-set!</a> <a id='549' tid='550' class='m'>*node-size-hash*</a> <a id='551' tid='552' class='m'>node</a> <a id='553' tid='554' class='m'>v</a>)
+            (<a id='555' tid='556' class='m'>void</a>))
+        <a id='557' tid='558' class='m'>v</a>))
+    (<span class='d'>cond</span>
+     [(<a id='563' tid='564' class='m'>pair?</a> <a id='565' tid='566' class='m'>node</a>)
+      (<a id='567' tid='568' class='m'>apply</a> <a id='569' tid='570' class='m'>+</a> (<a id='571' tid='572' class='m'>map</a> <a id='573' tid='574' class='m'>node-size</a> <a id='575' tid='576' class='m'>node</a>))]
+     <span class='d'>[(or (Token? node) (Str? node) (Char? node)) 1]</span>
+     [<span class='d'>(Expr? node)</span>
+      (<span class='d'>cond</span>
+       [(<a id='165' tid='166' class='m'>hash-has-key?</a> <a id='167' tid='168' class='m'>*node-size-hash*</a> <a id='169' tid='170' class='m'>node</a>)
+        (<a id='171' tid='172' class='m'>hash-ref</a> <a id='173' tid='174' class='m'>*node-size-hash*</a> <a id='175' tid='176' class='m'>node</a>)]
+       <span class='d'>[else
+        (memo (node-size (Expr-elts node)))]</span>)]
+     <span class='d'>[else 0]</span>)))
+
+
+(<a id='1539' tid='1540' class='u'>define</a> <a id='1541' tid='1542' class='u'>node-depth</a>
+  (<a id='577' tid='578' class='m'>lambda</a> (<a id='579' tid='580' class='m'>node</a>)
+    (<span class='d'>cond</span>
+     <span class='d'>[(null? node) 0]</span>
+     [(<a id='581' tid='582' class='m'>pair?</a> <a id='583' tid='584' class='m'>node</a>)
+      (<a id='585' tid='586' class='m'>apply</a> <a id='587' tid='588' class='m'>max</a> (<a id='589' tid='590' class='m'>map</a> <a id='591' tid='592' class='m'>node-depth</a> <a id='593' tid='594' class='m'>node</a>))]
+     <span class='d'>[(Expr? node)
+      (add1 (node-depth (Expr-elts node)))]</span>
+     <span class='d'>[else 0]</span>)))
+
+
+<span class='d'>; (node-depth (parse-scheme &quot;(lambda (x (x (y)) (y)) x)&quot;))
+</span>
+<span class='d'>;; (same-def? (parse-scheme &quot;(define f (x 1))&quot;)
+</span><span class='d'>;;            (parse-scheme &quot;(define f 2&quot;))
+</span>
+
+
+(<a id='1751' tid='1752' class='u'>define</a> <a id='1753' tid='1754' class='u'>uid</a>
+  (<a id='1755' tid='1756' class='u'>let</a> ([<a id='1757' tid='1758' class='u'>count</a> <a id='1759' tid='1760' class='u'>1</a>]
+        [<a id='1761' tid='1762' class='u'>table</a> (<a id='1763' tid='1764' class='u'>box</a> <a id='1765' tid='1766' class='u'>&#39;</a>())])
+    (<a id='1767' tid='1768' class='u'>lambda</a> (<a id='1769' tid='1770' class='u'>node</a>)
+      (<a id='1771' tid='1772' class='u'>let</a> ([<a id='1773' tid='1774' class='u'>p</a> (<a id='1775' tid='1776' class='u'>assq</a> <a id='1777' tid='1778' class='u'>node</a> (<a id='1779' tid='1780' class='u'>unbox</a> <a id='1781' tid='1782' class='u'>table</a>))])
+        (<a id='1783' tid='1784' class='u'>cond</a>
+         [(<a id='1785' tid='1786' class='u'>not</a> <a id='1787' tid='1788' class='u'>p</a>)
+          (<a id='1789' tid='1790' class='u'>let</a> ([<a id='1791' tid='1792' class='u'>id</a> <a id='1793' tid='1794' class='u'>count</a>])
+            (<a id='1795' tid='1796' class='u'>set!</a> <a id='1797' tid='1798' class='u'>count</a> (<a id='1799' tid='1800' class='u'>add1</a> <a id='1801' tid='1802' class='u'>count</a>))
+            (<a id='1803' tid='1804' class='u'>set-box!</a> <a id='1805' tid='1806' class='u'>table</a> (<a id='1807' tid='1808' class='u'>cons</a> <a id='1809' tid='1810' class='u'>`</a>(<a id='1811' tid='1812' class='u'>,</a><a id='1813' tid='1814' class='u'>node</a> <a id='1815' tid='1816' class='u'>.</a> <a id='1817' tid='1818' class='u'>,</a><a id='1819' tid='1820' class='u'>id</a>) (<a id='1821' tid='1822' class='u'>unbox</a> <a id='1823' tid='1824' class='u'>table</a>)))
+            <a id='1825' tid='1826' class='u'>id</a>)]
+         [<a id='1827' tid='1828' class='u'>else</a>
+          (<a id='1829' tid='1830' class='u'>cdr</a> <a id='1831' tid='1832' class='u'>p</a>)])))))
+
+
+
+(<a id='1559' tid='1560' class='u'>define</a> <a id='1561' tid='1562' class='u'>similarity</a>
+  (<a id='595' tid='596' class='m'>lambda</a> (<a id='597' tid='598' class='m'>change</a>)
+    (<span class='d'>let</span> <span class='d'>([total (+ (node-size (Change-orig change))
+                    (node-size (Change-cur change)))])</span>
+      (<a id='599' tid='600' class='m'>cond</a>
+       [(<a id='601' tid='602' class='m'>or</a> (<a id='603' tid='604' class='m'>=</a> <a id='605' tid='606' class='m'>0</a> <a id='607' tid='608' class='m'>total</a>) (<a id='609' tid='610' class='m'>=</a> <a id='611' tid='612' class='m'>0</a> (<a id='613' tid='614' class='m'>Change-cost</a> <a id='615' tid='616' class='m'>change</a>)))
+        <a id='617' tid='618' class='m'>&quot;100%&quot;</a>]
+       [<a id='619' tid='620' class='m'>else</a>
+        (<a id='621' tid='622' class='m'>string-append</a>
+         (<a id='623' tid='624' class='m'>real-&gt;decimal-string</a>
+          (<a id='625' tid='626' class='m'>*</a> <a id='627' tid='628' class='m'>100</a> (<a id='629' tid='630' class='m'>-</a> <a id='631' tid='632' class='m'>1.0</a> (<a id='633' tid='634' class='m'>/</a> (<a id='635' tid='636' class='m'>Change-cost</a> <a id='637' tid='638' class='m'>change</a>) <a id='639' tid='640' class='m'>total</a>))) <a id='641' tid='642' class='m'>1</a>)
+         <a id='643' tid='644' class='m'>&quot;%&quot;</a>)]))))
+
+
+
+<span class='d'>;-------------------------------------------------------------
+</span><span class='d'>;                        diff stuff
+</span><span class='d'>;-------------------------------------------------------------
+</span>
+<span class='d'>; 2-D memoization table
+</span>(<a id='1433' tid='1434' class='u'>define</a> <a id='1435' tid='1436' class='u'>make-table</a>
+  (<a id='1437' tid='1438' class='u'>lambda</a> (<a id='1439' tid='1440' class='u'>dim1</a> <a id='1441' tid='1442' class='u'>dim2</a>)
+    (<a id='1443' tid='1444' class='u'>let</a> ([<a id='1445' tid='1446' class='u'>vec</a> (<a id='1447' tid='1448' class='u'>make-vector</a> (<a id='1449' tid='1450' class='u'>add1</a> <a id='1451' tid='1452' class='u'>dim1</a>))])
+      (<a id='1453' tid='1454' class='u'>let</a> <a id='1455' tid='1456' class='u'>loop</a> ([<a id='1457' tid='1458' class='u'>n</a> <a id='1459' tid='1460' class='u'>0</a>])
+        (<a id='1461' tid='1462' class='u'>cond</a>
+         [(<a id='1463' tid='1464' class='u'>=</a> <a id='1465' tid='1466' class='u'>n</a> (<a id='1467' tid='1468' class='u'>vector-length</a> <a id='1469' tid='1470' class='u'>vec</a>)) <a id='1471' tid='1472' class='u'>vec</a>]
+         [<a id='1473' tid='1474' class='u'>else</a>
+          (<a id='1475' tid='1476' class='u'>vector-set!</a> <a id='1477' tid='1478' class='u'>vec</a> <a id='1479' tid='1480' class='u'>n</a> (<a id='1481' tid='1482' class='u'>make-vector</a> (<a id='1483' tid='1484' class='u'>add1</a> <a id='1485' tid='1486' class='u'>dim2</a>) <a id='1487' tid='1488' class='u'>#f</a>))
+          (<a id='1489' tid='1490' class='u'>loop</a> (<a id='1491' tid='1492' class='u'>add1</a> <a id='1493' tid='1494' class='u'>n</a>))])))))
+
+
+(<a id='1643' tid='1644' class='u'>define</a> <a id='1645' tid='1646' class='u'>table-ref</a>
+  (<a id='1647' tid='1648' class='u'>lambda</a> (<a id='1649' tid='1650' class='u'>t</a> <a id='1651' tid='1652' class='u'>x</a> <a id='1653' tid='1654' class='u'>y</a>)
+    (<a id='1655' tid='1656' class='u'>let</a> ([<a id='1657' tid='1658' class='u'>row</a> (<a id='1659' tid='1660' class='u'>vector-ref</a> <a id='1661' tid='1662' class='u'>t</a> <a id='1663' tid='1664' class='u'>x</a>)])
+      (<a id='1665' tid='1666' class='u'>vector-ref</a> <a id='1667' tid='1668' class='u'>row</a> <a id='1669' tid='1670' class='u'>y</a>))))
+
+
+(<a id='1671' tid='1672' class='u'>define</a> <a id='1673' tid='1674' class='u'>table-set!</a>
+  (<a id='1675' tid='1676' class='u'>lambda</a> (<a id='1677' tid='1678' class='u'>t</a> <a id='1679' tid='1680' class='u'>x</a> <a id='1681' tid='1682' class='u'>y</a> <a id='1683' tid='1684' class='u'>v</a>)
+    (<a id='1685' tid='1686' class='u'>let</a> ([<a id='1687' tid='1688' class='u'>row</a> (<a id='1689' tid='1690' class='u'>vector-ref</a> <a id='1691' tid='1692' class='u'>t</a> <a id='1693' tid='1694' class='u'>x</a>)])
+      (<a id='1695' tid='1696' class='u'>vector-set!</a> <a id='1697' tid='1698' class='u'>row</a> <a id='1699' tid='1700' class='u'>y</a> <a id='1701' tid='1702' class='u'>v</a>))))
+
+
+
+<span class='d'>;---------------- string distance function -----------------
+</span>
+(<a id='1567' tid='1568' class='u'>define</a> <a id='1569' tid='1570' class='u'>string-dist</a>
+  (<a id='1571' tid='1572' class='u'>lambda</a> (<a id='1573' tid='1574' class='u'>s1</a> <a id='1575' tid='1576' class='u'>s2</a>)
+    (<a id='1577' tid='1578' class='u'>let*</a> ([<a id='1579' tid='1580' class='u'>len1</a> (<a id='1581' tid='1582' class='u'>string-length</a> <a id='1583' tid='1584' class='u'>s1</a>)]
+           [<a id='1585' tid='1586' class='u'>len2</a> (<a id='1587' tid='1588' class='u'>string-length</a> <a id='1589' tid='1590' class='u'>s2</a>)]
+           [<a id='1591' tid='1592' class='u'>t</a> (<a id='1593' tid='1594' class='u'>make-table</a> <a id='1595' tid='1596' class='u'>len1</a> <a id='1597' tid='1598' class='u'>len2</a>)]
+           [<a id='1599' tid='1600' class='u'>char-dist</a> (<a id='1601' tid='1602' class='u'>dist1</a> <a id='1603' tid='1604' class='u'>t</a> <a id='1605' tid='1606' class='u'>s1</a> <a id='1607' tid='1608' class='u'>0</a> <a id='1609' tid='1610' class='u'>s2</a> <a id='1611' tid='1612' class='u'>0</a>)])
+      (<a id='1613' tid='1614' class='u'>cond</a>
+       [(<a id='1615' tid='1616' class='u'>=</a> <a id='1617' tid='1618' class='u'>0</a> (<a id='1619' tid='1620' class='u'>+</a> <a id='1621' tid='1622' class='u'>len1</a> <a id='1623' tid='1624' class='u'>len2</a>)) <a id='1625' tid='1626' class='u'>0</a>]
+       [<a id='1627' tid='1628' class='u'>else</a>
+        (<a id='1629' tid='1630' class='u'>/</a> (<a id='1631' tid='1632' class='u'>*</a> <a id='1633' tid='1634' class='u'>2.0</a> <a id='1635' tid='1636' class='u'>char-dist</a>) (<a id='1637' tid='1638' class='u'>+</a> <a id='1639' tid='1640' class='u'>len1</a> <a id='1641' tid='1642' class='u'>len2</a>))]))))
+
+
+
+(<a id='1135' tid='1136' class='u'>define</a> <a id='1137' tid='1138' class='u'>dist1</a>
+  (<a id='1159' tid='1160' class='u'>lambda</a> (<a id='1161' tid='1162' class='u'>table</a> <a id='1163' tid='1164' class='u'>s1</a> <a id='1165' tid='1166' class='u'>start1</a> <a id='1167' tid='1168' class='u'>s2</a> <a id='1169' tid='1170' class='u'>start2</a>)
+    (<a id='1139' tid='1140' class='u'>define</a> <a id='1141' tid='1142' class='u'>memo</a>
+      (<a id='1143' tid='1144' class='u'>lambda</a> (<a id='1145' tid='1146' class='u'>value</a>)
+        (<a id='1147' tid='1148' class='u'>table-set!</a> <a id='1149' tid='1150' class='u'>table</a> <a id='1151' tid='1152' class='u'>start1</a> <a id='1153' tid='1154' class='u'>start2</a> <a id='1155' tid='1156' class='u'>value</a>)
+        <a id='1157' tid='1158' class='u'>value</a>))
+    (<a id='1171' tid='1172' class='u'>cond</a>
+     [(<a id='1173' tid='1174' class='u'>table-ref</a> <a id='1175' tid='1176' class='u'>table</a> <a id='1177' tid='1178' class='u'>start1</a> <a id='1179' tid='1180' class='u'>start2</a>)
+      <a id='1181' tid='1182' class='u'>=&gt;</a> (<a id='1183' tid='1184' class='u'>lambda</a> (<a id='1185' tid='1186' class='u'>cached</a>) <a id='1187' tid='1188' class='u'>cached</a>)]
+     [(<a id='1189' tid='1190' class='u'>=</a> <a id='1191' tid='1192' class='u'>start1</a> (<a id='1193' tid='1194' class='u'>string-length</a> <a id='1195' tid='1196' class='u'>s1</a>))
+      (<a id='1197' tid='1198' class='u'>memo</a> (<a id='1199' tid='1200' class='u'>-</a> (<a id='1201' tid='1202' class='u'>string-length</a> <a id='1203' tid='1204' class='u'>s2</a>) <a id='1205' tid='1206' class='u'>start2</a>))]
+     [(<a id='1207' tid='1208' class='u'>=</a> <a id='1209' tid='1210' class='u'>start2</a> (<a id='1211' tid='1212' class='u'>string-length</a> <a id='1213' tid='1214' class='u'>s2</a>))
+      (<a id='1215' tid='1216' class='u'>memo</a> (<a id='1217' tid='1218' class='u'>-</a> (<a id='1219' tid='1220' class='u'>string-length</a> <a id='1221' tid='1222' class='u'>s1</a>) <a id='1223' tid='1224' class='u'>start1</a>))]
+     [<a id='1225' tid='1226' class='u'>else</a>
+      (<a id='1227' tid='1228' class='u'>let*</a> ([<a id='1229' tid='1230' class='u'>c1</a> (<a id='1231' tid='1232' class='u'>string-ref</a> <a id='1233' tid='1234' class='u'>s1</a> <a id='1235' tid='1236' class='u'>start1</a>)]
+             [<a id='1237' tid='1238' class='u'>c2</a> (<a id='1239' tid='1240' class='u'>string-ref</a> <a id='1241' tid='1242' class='u'>s2</a> <a id='1243' tid='1244' class='u'>start2</a>)]
+             [<a id='1245' tid='1246' class='u'>d0</a> (<a id='1247' tid='1248' class='u'>cond</a>
+                  [(<a id='1249' tid='1250' class='u'>char=?</a> <a id='1251' tid='1252' class='u'>c1</a> <a id='1253' tid='1254' class='u'>c2</a>) <a id='1255' tid='1256' class='u'>0</a>]
+                  [(<a id='1257' tid='1258' class='u'>char=?</a> (<a id='1259' tid='1260' class='u'>char-downcase</a> <a id='1261' tid='1262' class='u'>c1</a>)
+                           (<a id='1263' tid='1264' class='u'>char-downcase</a> <a id='1265' tid='1266' class='u'>c2</a>)) <a id='1267' tid='1268' class='u'>1</a>]
+                  [<a id='1269' tid='1270' class='u'>else</a> <a id='1271' tid='1272' class='u'>2</a>])]
+             [<a id='1273' tid='1274' class='u'>d1</a> (<a id='1275' tid='1276' class='u'>+</a> <a id='1277' tid='1278' class='u'>d0</a> (<a id='1279' tid='1280' class='u'>dist1</a> <a id='1281' tid='1282' class='u'>table</a> <a id='1283' tid='1284' class='u'>s1</a> (<a id='1285' tid='1286' class='u'>add1</a> <a id='1287' tid='1288' class='u'>start1</a>) <a id='1289' tid='1290' class='u'>s2</a> (<a id='1291' tid='1292' class='u'>add1</a> <a id='1293' tid='1294' class='u'>start2</a>)))]
+             [<a id='1295' tid='1296' class='u'>d2</a> (<a id='1297' tid='1298' class='u'>+</a> <a id='1299' tid='1300' class='u'>1</a> (<a id='1301' tid='1302' class='u'>dist1</a> <a id='1303' tid='1304' class='u'>table</a> <a id='1305' tid='1306' class='u'>s1</a> (<a id='1307' tid='1308' class='u'>add1</a> <a id='1309' tid='1310' class='u'>start1</a>) <a id='1311' tid='1312' class='u'>s2</a> <a id='1313' tid='1314' class='u'>start2</a>))]
+             [<a id='1315' tid='1316' class='u'>d3</a> (<a id='1317' tid='1318' class='u'>+</a> <a id='1319' tid='1320' class='u'>1</a> (<a id='1321' tid='1322' class='u'>dist1</a> <a id='1323' tid='1324' class='u'>table</a> <a id='1325' tid='1326' class='u'>s1</a> <a id='1327' tid='1328' class='u'>start1</a> <a id='1329' tid='1330' class='u'>s2</a> (<a id='1331' tid='1332' class='u'>add1</a> <a id='1333' tid='1334' class='u'>start2</a>)))])
+        (<a id='1335' tid='1336' class='u'>memo</a> (<a id='1337' tid='1338' class='u'>min</a> <a id='1339' tid='1340' class='u'>d1</a> <a id='1341' tid='1342' class='u'>d2</a> <a id='1343' tid='1344' class='u'>d3</a>)))])))
+
+
+
+(<a id='1131' tid='1132' class='u'>define</a> <a id='1133' tid='1134' class='u'>diff-string</a>
+  (<a id='91' tid='92' class='m'>lambda</a> (<a id='93' tid='94' class='m'>string1</a> <a id='95' tid='96' class='m'>string2</a> <a id='97' tid='98' class='m'>node1</a> <a id='99' tid='100' class='m'>node2</a>)
+    (<span class='d'>cond</span>
+     [(<a id='101' tid='102' class='m'>or</a> (<a id='103' tid='104' class='m'>&gt;</a> (<a id='105' tid='106' class='m'>string-length</a> <a id='107' tid='108' class='m'>string1</a>) <a id='109' tid='110' class='m'>*max-string-len*</a>)
+          (<a id='111' tid='112' class='m'>&gt;</a> (<a id='113' tid='114' class='m'>string-length</a> <a id='115' tid='116' class='m'>string2</a>) <a id='117' tid='118' class='m'>*max-string-len*</a>))
+      <span class='d'>(cond
+       [(equal? string1 string2)
+        (values (mod-node node1 node2 0) 0)]
+       [else
+        (total node1 node2)])</span>]
+     <span class='d'>[else
+      (let ([cost (string-dist string1 string2)])
+        (values (mod-node node1 node2 cost) cost))]</span>)))
+
+
+
+
+<span class='d'>;--------------------- main node diff function ----------------------
+</span>(<a id='1119' tid='1120' class='u'>define</a> <a id='1121' tid='1122' class='u'>diff-node</a>
+  (<span class='d'>lambda</span> <span class='d'>(node1 node2 depth move?)</span>
+
+    (<a id='645' tid='646' class='m'>define</a> <a id='647' tid='648' class='m'>memo</a>
+      (<a id='649' tid='650' class='m'>lambda</a> (<a id='651' tid='652' class='m'>v1</a> <a id='653' tid='654' class='m'>v2</a>)
+        (<span class='d'>if</span> (<a id='199' tid='200' class='m'>and</a> (<a id='201' tid='202' class='m'>&gt;</a> (<a id='203' tid='204' class='m'>node-size</a> <a id='205' tid='206' class='m'>node1</a>) <a id='207' tid='208' class='m'>*memo-node-size*</a>)
+                 (<a id='209' tid='210' class='m'>&gt;</a> (<a id='211' tid='212' class='m'>node-size</a> <a id='213' tid='214' class='m'>node2</a>) <a id='215' tid='216' class='m'>*memo-node-size*</a>))
+            (<a id='655' tid='656' class='m'>hash-put!</a> <a id='657' tid='658' class='m'>*diff-hash*</a> <a id='659' tid='660' class='m'>node1</a> <a id='661' tid='662' class='m'>node2</a> (<a id='663' tid='664' class='m'>cons</a> <a id='665' tid='666' class='m'>v1</a> <a id='667' tid='668' class='m'>v2</a>))
+            <span class='d'>(void)</span>)
+        (<a id='669' tid='670' class='m'>values</a> <a id='671' tid='672' class='m'>v1</a> <a id='673' tid='674' class='m'>v2</a>)))
+
+    (<span class='d'>define</span> <span class='d'>trysub</span>
+      (<span class='d'>lambda</span> <span class='d'>(changes cost)</span>
+        (<span class='d'>cond</span>
+         <span class='d'>[(or (not move?)
+              (similar? node1 node2 cost))
+          (memo changes cost)]</span>
+         [<a id='177' tid='178' class='m'>else</a>
+          (<span class='d'>letv</span> <span class='d'>([(m c) (diff-sub node1 node2 depth move?)])</span>
+            (<a id='179' tid='180' class='m'>cond</a>
+             [(<a id='181' tid='182' class='m'>not</a> <a id='183' tid='184' class='m'>m</a>)
+              (<a id='185' tid='186' class='m'>memo</a> <a id='187' tid='188' class='m'>changes</a> <a id='189' tid='190' class='m'>cost</a>)]
+             [<a id='191' tid='192' class='m'>else</a>
+              (<a id='193' tid='194' class='m'>memo</a> <a id='195' tid='196' class='m'>m</a> <a id='197' tid='198' class='m'>c</a>)]))])))
+
+    <span class='d'>(diff-progress 1)</span>
+
+    (<span class='d'>cond</span>
+     [(<a id='229' tid='230' class='m'>hash-get</a> <a id='231' tid='232' class='m'>*diff-hash*</a> <a id='233' tid='234' class='m'>node1</a> <a id='235' tid='236' class='m'>node2</a>)
+      <a id='237' tid='238' class='m'>=&gt;</a> (<a id='319' tid='320' class='m'>lambda</a> (<a id='321' tid='322' class='m'>cached</a>)
+           (<a id='323' tid='324' class='m'>values</a> (<a id='325' tid='326' class='m'>car</a> <a id='327' tid='328' class='m'>cached</a>) (<a id='329' tid='330' class='m'>cdr</a> <a id='331' tid='332' class='m'>cached</a>)))]
+     <span class='d'>[(and (Char? node1) (Char? node2))
+      (diff-string (char-&gt;string (Char-c node1))
+                   (char-&gt;string (Char-c node2))
+                   node1 node2)]</span>
+     <span class='d'>[(and (Str? node1) (Str? node2))
+      (diff-string (Str-s node1) (Str-s node2) node1 node2)]</span>
+     <span class='d'>[(and (Comment? node1) (Comment? node2))
+      (diff-string (Comment-text node1) (Comment-text node2) node1 node2)]</span>
+     <span class='d'>[(and (Token? node1) (Token? node2))
+      (diff-string (Token-text node1) (Token-text node2) node1 node2)]</span>
+     <span class='d'>[(and (Expr? node1) (Expr? node2)
+           (keywords-equal? node1 node2))
+      (letv ([t (make-hasheq)]
+             [(m c) (diff-list t (Expr-elts node1) (Expr-elts node2)
+                               depth move?)])
+        (trysub m c))]</span>
+     [(<a id='217' tid='218' class='m'>and</a> (<a id='219' tid='220' class='m'>pair?</a> <a id='221' tid='222' class='m'>node1</a>) (<a id='223' tid='224' class='m'>not</a> (<a id='225' tid='226' class='m'>pair?</a> <a id='227' tid='228' class='m'>node2</a>)))
+      <span class='d'>(let ([t (make-hasheq)])
+        (diff-list t node1 (list node2) depth move?))</span>]
+     [(<a id='57' tid='58' class='m'>and</a> (<a id='59' tid='60' class='m'>not</a> (<a id='61' tid='62' class='m'>pair?</a> <a id='63' tid='64' class='m'>node1</a>)) (<a id='65' tid='66' class='m'>pair?</a> <a id='67' tid='68' class='m'>node2</a>))
+      <span class='d'>(let ([t (make-hasheq)])
+        (diff-list t (list node1) node2 depth move?))</span>]
+     <span class='d'>[(and (pair? node1) (pair? node2))
+      (let ([t (make-hasheq)])
+        (diff-list t node1 node2 depth move?))]</span>
+     [<a id='1' tid='2' class='m'>else</a>
+      (<span class='d'>letv</span> ([(<a id='3' tid='4' class='m'>m</a> <a id='5' tid='6' class='m'>c</a>) (<a id='7' tid='8' class='m'>total</a> <a id='9' tid='10' class='m'>node1</a> <a id='11' tid='12' class='m'>node2</a>)])
+        <span class='d'>(trysub m c)</span>)])))
+
+
+
+
+
+
+<span class='d'>;; global 2D hash for storing known diffs
+</span>(<a id='763' tid='764' class='u'>define</a> <a id='765' tid='766' class='u'>*diff-hash*</a> (<a id='767' tid='768' class='u'>make-hasheq</a>))
+
+(<a id='1115' tid='1116' class='u'>define</a> <a id='1117' tid='1118' class='u'>diff-list</a>
+  (<span class='d'>lambda</span> <span class='d'>(table ls1 ls2 depth move?)</span>
+
+    (<a id='239' tid='240' class='m'>define</a> <a id='241' tid='242' class='m'>memo</a>
+      (<a id='243' tid='244' class='m'>lambda</a> (<a id='245' tid='246' class='m'>v1</a> <a id='247' tid='248' class='m'>v2</a>)
+        (<a id='249' tid='250' class='m'>hash-put!</a> <a id='251' tid='252' class='m'>table</a> <a id='253' tid='254' class='m'>ls1</a> <a id='255' tid='256' class='m'>ls2</a> (<a id='257' tid='258' class='m'>cons</a> <a id='259' tid='260' class='m'>v1</a> <a id='261' tid='262' class='m'>v2</a>))
+        (<a id='263' tid='264' class='m'>values</a> <a id='265' tid='266' class='m'>v1</a> <a id='267' tid='268' class='m'>v2</a>)))
+
+    (<span class='d'>define</span> <span class='d'>guess</span>
+      (<span class='d'>lambda</span> <span class='d'>(ls1  ls2)</span>
+        (<span class='d'>letv</span> <span class='d'>([(m0 c0) (diff-node (car ls1) (car ls2) depth move?)]
+               [(m1 c1) (diff-list table (cdr ls1) (cdr ls2) depth move?)]
+               [(cost1) (+ c0 c1)])</span>
+          (<a id='119' tid='120' class='m'>cond</a>
+           [(<span class='d'>or</span> (<a id='121' tid='122' class='m'>same-def?</a> (<a id='123' tid='124' class='m'>car</a> <a id='125' tid='126' class='m'>ls1</a>) (<a id='127' tid='128' class='m'>car</a> <a id='129' tid='130' class='m'>ls2</a>))
+                <span class='d'>(and (not (different-def? (car ls1) (car ls2)))
+                     (similar? (car ls1) (car ls2) c0))</span>)
+            (<a id='131' tid='132' class='m'>memo</a> (<a id='133' tid='134' class='m'>append</a> <a id='135' tid='136' class='m'>m0</a> <a id='137' tid='138' class='m'>m1</a>) <a id='139' tid='140' class='m'>cost1</a>)]
+           [<a id='141' tid='142' class='m'>else</a>
+            (<span class='d'>letv</span> (<span class='d'>[(m2 c2) (diff-list table (cdr ls1) ls2  depth move?)]</span>
+                   <span class='d'>[(m3 c3) (diff-list table ls1 (cdr ls2) depth move?)]</span>
+                   [<a id='143' tid='144' class='m'>cost2</a> (<a id='145' tid='146' class='m'>+</a> <a id='147' tid='148' class='m'>c2</a> (<a id='149' tid='150' class='m'>node-size</a> (<a id='151' tid='152' class='m'>car</a> <a id='153' tid='154' class='m'>ls1</a>)))]
+                   [<a id='69' tid='70' class='m'>cost3</a> (<a id='71' tid='72' class='m'>+</a> <a id='73' tid='74' class='m'>c3</a> (<a id='75' tid='76' class='m'>node-size</a> (<a id='77' tid='78' class='m'>car</a> <a id='79' tid='80' class='m'>ls2</a>)))])
+              <span class='d'>(cond
+               ;; They can&#39;t be same-def now.
+               ;; don&#39;t move them. It is quite confusing
+
+               ;; [(and (not (different-def? (car ls1) (car ls2)))
+               ;;       (&lt;= cost1 cost2) (&lt;= cost1 cost3))
+               ;;  (memo (append m0 m1) cost1)]
+               [(&lt;= cost2 cost3)
+                (memo (append (del-node (car ls1)) m2) cost2)]
+               [else
+                (memo (append (ins-node (car ls2)) m3) cost3)])</span>)]))))
+
+    (<span class='d'>cond</span>
+     [(<a id='285' tid='286' class='m'>hash-get</a> <a id='287' tid='288' class='m'>table</a> <a id='289' tid='290' class='m'>ls1</a> <a id='291' tid='292' class='m'>ls2</a>)
+      <a id='293' tid='294' class='m'>=&gt;</a> (<a id='333' tid='334' class='m'>lambda</a> (<a id='335' tid='336' class='m'>cached</a>)
+           (<a id='337' tid='338' class='m'>values</a> (<a id='339' tid='340' class='m'>car</a> <a id='341' tid='342' class='m'>cached</a>) (<a id='343' tid='344' class='m'>cdr</a> <a id='345' tid='346' class='m'>cached</a>)))]
+     [(<a id='269' tid='270' class='m'>and</a> (<a id='271' tid='272' class='m'>null?</a> <a id='273' tid='274' class='m'>ls1</a>) (<a id='275' tid='276' class='m'>null?</a> <a id='277' tid='278' class='m'>ls2</a>))
+      (<a id='279' tid='280' class='m'>values</a> <a id='281' tid='282' class='m'>&#39;</a>() <a id='283' tid='284' class='m'>0</a>)]
+     <span class='d'>[(null? ls1)
+      (let ([changes (apply append (map ins-node ls2))])
+        (values changes (node-size ls2)))]</span>
+     <span class='d'>[(null? ls2)
+      (let ([changes (apply append (map del-node ls1))])
+        (values changes (node-size ls1)))]</span>
+     <span class='d'>[else
+      (guess ls1 ls2)]</span>)))
+
+
+
+
+
+
+(<span class='d'>define</span> <span class='d'>diff-sub</span>
+  (<span class='d'>lambda</span> <span class='d'>(node1 node2 depth move?)</span>
+    (<span class='d'>cond</span>
+     <span class='d'>[(or (&gt;= depth *move-depth*)
+          (&lt; (node-size node1) *min-frame-size*)
+          (&lt; (node-size node2) *min-frame-size*))
+      (values #f #f)]</span>
+     [<span class='d'>(and (Expr? node1) (Expr? node2))</span>
+      (<span class='d'>cond</span>
+       [<span class='d'>(&lt; (node-size node1) (node-size node2))</span>
+        (<span class='d'>let</span> <span class='d'>loop</span> <span class='d'>([elts2 (Expr-elts node2)])</span>
+          (<a id='357' tid='358' class='m'>cond</a>
+           [(<a id='415' tid='416' class='m'>null?</a> <a id='417' tid='418' class='m'>elts2</a>) (<a id='419' tid='420' class='m'>values</a> <a id='421' tid='422' class='m'>#f</a> <a id='423' tid='424' class='m'>#f</a>)]
+           [<a id='359' tid='360' class='m'>else</a>
+            (<span class='d'>letv</span> <span class='d'>([(m0 c0) (diff-node node1 (car elts2) (add1 depth) move?)])</span>
+              (<a id='295' tid='296' class='m'>cond</a>
+               [<span class='d'>(or (same-def? node1 (car elts2))
+                    (similar? node1 (car elts2) c0))</span>
+                (<span class='d'>let</span> <span class='d'>([frame (extract-ins-frame node2 (car elts2))]
+                      [frame-size (- (node-size node2) (node-size (car elts2)))])</span>
+                  (<a id='361' tid='362' class='m'>values</a> (<a id='363' tid='364' class='m'>append</a> <a id='365' tid='366' class='m'>m0</a> <a id='367' tid='368' class='m'>frame</a>) <a id='369' tid='370' class='m'>c0</a>))]
+               [<a id='297' tid='298' class='m'>else</a>
+                (<a id='299' tid='300' class='m'>loop</a> (<a id='301' tid='302' class='m'>cdr</a> <a id='303' tid='304' class='m'>elts2</a>))]))]))]
+       [<span class='d'>(&gt; (node-size node1) (node-size node2))</span>
+        (<span class='d'>let</span> <span class='d'>loop</span> <span class='d'>([elts1 (Expr-elts node1)])</span>
+          (<a id='305' tid='306' class='m'>cond</a>
+           [(<a id='347' tid='348' class='m'>null?</a> <a id='349' tid='350' class='m'>elts1</a>) (<a id='351' tid='352' class='m'>values</a> <a id='353' tid='354' class='m'>#f</a> <a id='355' tid='356' class='m'>#f</a>)]
+           [<a id='307' tid='308' class='m'>else</a>
+            (<span class='d'>letv</span> <span class='d'>([(m0 c0) (diff-node (car elts1) node2 (add1 depth) move?)])</span>
+              (<a id='155' tid='156' class='m'>cond</a>
+               [<span class='d'>(or (same-def? (car elts1) node2)
+                    (similar? (car elts1) node2 c0))</span>
+                (<span class='d'>let</span> <span class='d'>([frame (extract-del-frame node1 (car elts1))]
+                      [frame-size (- (node-size node1) (node-size (car elts1)))])</span>
+                  (<a id='309' tid='310' class='m'>values</a> (<a id='311' tid='312' class='m'>append</a> <a id='313' tid='314' class='m'>m0</a> <a id='315' tid='316' class='m'>frame</a>) <a id='317' tid='318' class='m'>c0</a>))]
+               [<a id='157' tid='158' class='m'>else</a>
+                (<a id='159' tid='160' class='m'>loop</a> (<a id='161' tid='162' class='m'>cdr</a> <a id='163' tid='164' class='m'>elts1</a>))]))]))]
+       <span class='d'>[else                            ; equal size
+        (values #f #f)]</span>)]
+     <span class='d'>[else (values #f #f)]</span>)))
+
+
+
+
+<a id='1937' tid='1938' class='u'>;-------------------------------------------------------------
+</a><span class='d'>;                    finding moves
+</span><span class='d'>;-------------------------------------------------------------
+</span>
+(<a id='1065' tid='1066' class='u'>define</a> <a id='1067' tid='1068' class='u'>big-node?</a>
+  (<a id='1069' tid='1070' class='u'>lambda</a> (<a id='1071' tid='1072' class='u'>node</a>)
+    (<a id='1073' tid='1074' class='u'>&gt;=</a> (<a id='1075' tid='1076' class='u'>node-size</a> <a id='1077' tid='1078' class='u'>node</a>) <a id='1079' tid='1080' class='u'>*move-size*</a>)))
+
+
+
+<span class='d'>(define shallow-frame?
+  (lambda (node)
+    (and (eq? &#39;frame (node-type node))
+         (&lt; (node-depth node) *min-frame-depth*))))</span>
+
+
+(<a id='1061' tid='1062' class='u'>define</a> <a id='1063' tid='1064' class='u'>big-change?</a>
+  <span class='d'>(lambda (c)
+    (cond
+     [(ins? c)
+      (big-node? (Change-cur c))]
+     [(del? c)
+      (big-node? (Change-orig c))]
+     [(mod? c)
+      (or (big-node? (Change-orig c))
+          (big-node? (Change-cur c)))]))</span>)
+
+
+<span class='d'>(define shallow-change?
+  (lambda (c)
+    (cond
+     [(ins? c)
+      (shallow-frame? (Change-cur c))]
+     [(del? c)
+      (shallow-frame? (Change-orig c))]
+     [(mod? c)
+      (or (shallow-frame? (Change-orig c))
+          (shallow-frame? (Change-cur c)))])))</span>
+
+
+<span class='d'>(define large-change?
+  (predand big-change? (negate shallow-frame?)))</span>
+
+
+
+<span class='d'>; ((predand number? (lambda (x) (&gt; x 1))) 0)
+</span><span class='d'>; ((predor number? (lambda (x) (&gt; x 1))) 5)
+</span>
+
+(<a id='1547' tid='1548' class='u'>define</a> <a id='1549' tid='1550' class='u'>node-sort-fn</a>
+  <span class='d'>(lambda (x y)
+    (&lt; (get-start x) (get-start y)))</span>)
+
+
+<span class='d'>;; iterate the dynamic programming
+</span>(<a id='1103' tid='1104' class='u'>define</a> <a id='1105' tid='1106' class='u'>closure</a>
+  (<a id='675' tid='676' class='m'>lambda</a> (<a id='677' tid='678' class='m'>changes</a>)
+    (<a id='679' tid='680' class='m'>set!</a> <a id='681' tid='682' class='m'>*diff-hash*</a> (<a id='683' tid='684' class='m'>make-hasheq</a>))
+    (<span class='d'>let</span> <span class='d'>loop</span> <span class='d'>([changes changes] [moved &#39;()] [count 1])</span>
+      (<span class='d'>cond</span>
+       <span class='d'>[(&gt; count *move-iteration*)
+        (let ([all-changes (append changes moved)])
+          (apply append (map disassemble-change all-changes)))]</span>
+       [<span class='d'>else</span>
+        <span class='d'>(printf &quot;~n[closure loop #~a] &quot; count)</span>
+        (<span class='d'>let*</span> <span class='d'>([del-changes (filter (predand del?
+                                             (predor (lambda (c)
+                                                       (language-specific-include?
+                                                        (Change-orig c)))
+                                                     large-change?))
+                                    changes)]
+               [add-changes (filter (predand ins?
+                                             (predor (lambda (c)
+                                                       (language-specific-include?
+                                                        (Change-cur c)))
+                                                     large-change?))
+                                    changes)]
+               [old-moves (filter mod? changes)]
+               [unincluded (set- changes (append old-moves
+                                                 del-changes
+                                                 add-changes))]
+               [dels (map Change-orig del-changes)]
+               [adds (map Change-cur add-changes)]
+               [sorted-dels (sort dels node-sort-fn)]
+               [sorted-adds (sort adds node-sort-fn)])</span>
+
+          (<a id='685' tid='686' class='m'>letv</a> (<span class='d'>[t (make-hasheq)]</span>
+                 <span class='d'>[(m c) (diff-list t sorted-dels sorted-adds 0 #t)]</span>
+                 [<a id='687' tid='688' class='m'>new-moves</a> (<a id='689' tid='690' class='m'>map</a> <a id='691' tid='692' class='m'>mod-&gt;mov</a> (<a id='693' tid='694' class='m'>filter</a> <a id='695' tid='696' class='m'>mod?</a> <a id='697' tid='698' class='m'>m</a>))])
+            (<a id='699' tid='700' class='m'>printf</a> <a id='701' tid='702' class='m'>&quot;~n~a new moves found&quot;</a> (<a id='703' tid='704' class='m'>length</a> <a id='705' tid='706' class='m'>new-moves</a>))
+            (<span class='d'>cond</span>
+             <span class='d'>[(null? new-moves)
+              (let ([all-changes (append m old-moves unincluded moved)])
+                (apply append (map disassemble-change all-changes)))]</span>
+             [<a id='707' tid='708' class='m'>else</a>
+              (<span class='d'>let</span> ([<a id='709' tid='710' class='m'>new-changes</a> (<a id='711' tid='712' class='m'>filter</a> (<a id='713' tid='714' class='m'>negate</a> <a id='715' tid='716' class='m'>mod?</a>) <a id='717' tid='718' class='m'>m</a>)])
+                <span class='d'>(loop new-changes
+                      (append new-moves old-moves unincluded moved)
+                      (add1 count))</span>)])))]))))
+
+
+<span class='d'>(define language-specific-similar?
+  (lambda (e1 e2 c)
+    #f))</span>
+
+<span class='d'>(define language-specific-include?
+  (lambda (e)
+    #f))</span>
+
+
+
+
+<span class='d'>;-------------------------------------------------------------
+</span><span class='d'>;                      HTML generation
+</span><span class='d'>;-------------------------------------------------------------
+</span>
+(<a id='1081' tid='1082' class='u'>define</a> <a id='1083' tid='1084' class='u'>change-tags</a>
+  (<a id='719' tid='720' class='m'>lambda</a> (<a id='721' tid='722' class='m'>changes</a> <a id='723' tid='724' class='m'>side</a>)
+    (<a id='725' tid='726' class='m'>let</a> <a id='727' tid='728' class='m'>loop</a> ([<a id='729' tid='730' class='m'>cs</a> <a id='731' tid='732' class='m'>changes</a>] [<a id='733' tid='734' class='m'>tags</a> <a id='735' tid='736' class='m'>&#39;</a>()])
+      (<a id='737' tid='738' class='m'>cond</a>
+       [(<a id='739' tid='740' class='m'>null?</a> <a id='741' tid='742' class='m'>cs</a>) <a id='743' tid='744' class='m'>tags</a>]
+       [<a id='745' tid='746' class='m'>else</a>
+        (<span class='d'>let</span> <span class='d'>([key (if (eq? side &#39;left)
+                       (Change-orig (car cs))
+                       (Change-cur (car cs)))])</span>
+          (<span class='d'>cond</span>
+           <span class='d'>[(or (not key)
+                (= (get-start key) (get-end key)))
+            (loop (cdr cs) tags)]</span>
+           [<span class='d'>(and (Change-orig (car cs)) (Change-cur (car cs)))</span>
+            (<span class='d'>let</span> <span class='d'>([startTag (Tag (link-start (car cs) side)
+                                 (get-start key) -1)]
+                  [endTag (Tag &quot;&lt;/a&gt;&quot; (get-end key) (get-start key))])</span>
+              (<a id='747' tid='748' class='m'>loop</a> (<a id='749' tid='750' class='m'>cdr</a> <a id='751' tid='752' class='m'>cs</a>) (<a id='753' tid='754' class='m'>cons</a> <a id='755' tid='756' class='m'>endTag</a> (<a id='757' tid='758' class='m'>cons</a> <a id='759' tid='760' class='m'>startTag</a> <a id='761' tid='762' class='m'>tags</a>))))]
+           [<a id='371' tid='372' class='m'>else</a>
+            (<span class='d'>let</span> <span class='d'>([startTag (Tag (span-start (car cs) side)
+                                 (get-start key) -1)]
+                  [endTag (Tag &quot;&lt;/span&gt;&quot; (get-end key) (get-start key))])</span>
+              (<a id='373' tid='374' class='m'>loop</a> (<a id='375' tid='376' class='m'>cdr</a> <a id='377' tid='378' class='m'>cs</a>) (<a id='379' tid='380' class='m'>cons</a> <a id='381' tid='382' class='m'>endTag</a> (<a id='383' tid='384' class='m'>cons</a> <a id='385' tid='386' class='m'>startTag</a> <a id='387' tid='388' class='m'>tags</a>))))]))]))))
+
+
+(<a id='821' tid='822' class='u'>define</a> <a id='823' tid='824' class='u'>apply-tags</a>
+  (<a id='825' tid='826' class='u'>lambda</a> (<a id='827' tid='828' class='u'>s</a> <a id='829' tid='830' class='u'>tags</a>)
+    (<a id='831' tid='832' class='u'>let</a> ([<a id='833' tid='834' class='u'>tags</a> (<a id='835' tid='836' class='u'>sort</a> <a id='837' tid='838' class='u'>tags</a> <a id='839' tid='840' class='u'>tag-sort-fn</a>)])
+      (<a id='841' tid='842' class='u'>let</a> <a id='843' tid='844' class='u'>loop</a> ([<a id='845' tid='846' class='u'>tags</a> <a id='847' tid='848' class='u'>tags</a>] [<a id='849' tid='850' class='u'>curr</a> <a id='851' tid='852' class='u'>0</a>] [<a id='853' tid='854' class='u'>out</a> <a id='855' tid='856' class='u'>&#39;</a>()])
+        (<a id='857' tid='858' class='u'>cond</a>
+         [(<a id='859' tid='860' class='u'>null?</a> <a id='861' tid='862' class='u'>tags</a>)
+          (<a id='863' tid='864' class='u'>cond</a>
+           [(<a id='865' tid='866' class='u'>&lt;</a> <a id='867' tid='868' class='u'>curr</a> (<a id='869' tid='870' class='u'>string-length</a> <a id='871' tid='872' class='u'>s</a>))
+            (<a id='873' tid='874' class='u'>loop</a> <a id='875' tid='876' class='u'>tags</a> (<a id='877' tid='878' class='u'>add1</a> <a id='879' tid='880' class='u'>curr</a>) (<a id='881' tid='882' class='u'>cons</a> (<a id='883' tid='884' class='u'>escape</a> (<a id='885' tid='886' class='u'>string-ref</a> <a id='887' tid='888' class='u'>s</a> <a id='889' tid='890' class='u'>curr</a>)) <a id='891' tid='892' class='u'>out</a>))]
+           [<a id='893' tid='894' class='u'>else</a>
+            (<a id='895' tid='896' class='u'>apply</a> <a id='897' tid='898' class='u'>string-append</a> (<a id='899' tid='900' class='u'>reverse</a> <a id='901' tid='902' class='u'>out</a>))])]
+         [<a id='903' tid='904' class='u'>else</a>
+          (<a id='905' tid='906' class='u'>cond</a>
+           [(<a id='907' tid='908' class='u'>&lt;</a> <a id='909' tid='910' class='u'>curr</a> (<a id='911' tid='912' class='u'>Tag-idx</a> (<a id='913' tid='914' class='u'>car</a> <a id='915' tid='916' class='u'>tags</a>)))
+            (<a id='917' tid='918' class='u'>loop</a> <a id='919' tid='920' class='u'>tags</a> (<a id='921' tid='922' class='u'>add1</a> <a id='923' tid='924' class='u'>curr</a>) (<a id='925' tid='926' class='u'>cons</a> (<a id='927' tid='928' class='u'>escape</a> (<a id='929' tid='930' class='u'>string-ref</a> <a id='931' tid='932' class='u'>s</a> <a id='933' tid='934' class='u'>curr</a>)) <a id='935' tid='936' class='u'>out</a>))]
+           [<a id='937' tid='938' class='u'>else</a>
+            (<a id='939' tid='940' class='u'>loop</a> (<a id='941' tid='942' class='u'>cdr</a> <a id='943' tid='944' class='u'>tags</a>) <a id='945' tid='946' class='u'>curr</a> (<a id='947' tid='948' class='u'>cons</a> (<a id='949' tid='950' class='u'>Tag-tag</a> (<a id='951' tid='952' class='u'>car</a> <a id='953' tid='954' class='u'>tags</a>)) <a id='955' tid='956' class='u'>out</a>))])])))))
+
+
+
+(<a id='1429' tid='1430' class='u'>define</a> <a id='1431' tid='1432' class='u'>link-start</a>
+  (<span class='d'>lambda</span> <span class='d'>(change side)</span>
+    (<span class='d'>let</span> ([<span class='d'>cls</span> (<span class='d'>cond</span>
+                [(<a id='23' tid='24' class='m'>and</a> (<a id='25' tid='26' class='m'>eq?</a> (<a id='27' tid='28' class='m'>Change-type</a> <a id='29' tid='30' class='m'>change</a>) <a id='31' tid='32' class='m'>&#39;</a><a id='33' tid='34' class='m'>mov</a>)
+                      (<a id='35' tid='36' class='m'>&gt;</a> (<a id='37' tid='38' class='m'>Change-cost</a> <a id='39' tid='40' class='m'>change</a>) <a id='41' tid='42' class='m'>0</a>))
+                 <span class='d'>&quot;move-change&quot;</span>]
+                [(<a id='13' tid='14' class='m'>eq?</a> (<a id='15' tid='16' class='m'>Change-type</a> <a id='17' tid='18' class='m'>change</a>) <a id='19' tid='20' class='m'>&#39;</a><a id='21' tid='22' class='m'>mov</a>) <span class='d'>&quot;move&quot;</span>]
+                <span class='d'>[(&gt; (Change-cost change) 0) &quot;change&quot;]</span>
+                <span class='d'>[else &quot;unchanged&quot;]</span>)]
+          <span class='d'>[text (string-append &quot;(similarity &quot; (similarity change) &quot;)&quot;)]</span>
+          <span class='d'>[me (if (eq? side &#39;left)
+                  (Change-orig change)
+                  (Change-cur change))]</span>
+          <span class='d'>[other (if (eq? side &#39;left)
+                  (Change-cur change)
+                  (Change-orig change))]</span>)
+      <span class='d'>(string-append
+       &quot;&lt;a id=&quot;   (qs (uid me))
+       &quot; tid=&quot; (qs (uid other)) &quot;,&quot;
+       &quot; class=\&quot;&quot;  cls   &quot;\&quot;&quot;
+       &quot; title=\&quot;&quot;  text  &quot;\&quot;&gt;&quot;)</span>)))
+
+
+
+(<a id='1563' tid='1564' class='u'>define</a> <a id='1565' tid='1566' class='u'>span-start</a>
+  <span class='d'>(lambda (change side)
+    (let ([cls (if (Change-orig change) &quot;deletion&quot; &quot;insertion&quot;)]
+          [text (if (Change-orig change) &quot;deleted&quot; &quot;inserted&quot;)])
+      (string-append &quot;&lt;span class=\&quot;&quot; cls &quot;\&quot; title=\&quot;&quot; text &quot;\&quot;&gt;&quot;)))</span>)
+
+
+
+(<a id='1703' tid='1704' class='u'>define</a> <a id='1705' tid='1706' class='u'>tag-sort-fn</a>
+  (<a id='1707' tid='1708' class='u'>lambda</a> (<a id='1709' tid='1710' class='u'>t1</a> <a id='1711' tid='1712' class='u'>t2</a>)
+    (<a id='1713' tid='1714' class='u'>cond</a>
+     [(<a id='1715' tid='1716' class='u'>=</a> (<a id='1717' tid='1718' class='u'>Tag-idx</a> <a id='1719' tid='1720' class='u'>t1</a>) (<a id='1721' tid='1722' class='u'>Tag-idx</a> <a id='1723' tid='1724' class='u'>t2</a>))
+      (<a id='1725' tid='1726' class='u'>&gt;</a> (<a id='1727' tid='1728' class='u'>Tag-start</a> <a id='1729' tid='1730' class='u'>t1</a>) (<a id='1731' tid='1732' class='u'>Tag-start</a> <a id='1733' tid='1734' class='u'>t2</a>))]
+     [<a id='1735' tid='1736' class='u'>else</a>
+      (<a id='1737' tid='1738' class='u'>&lt;</a> (<a id='1739' tid='1740' class='u'>Tag-idx</a> <a id='1741' tid='1742' class='u'>t1</a>) (<a id='1743' tid='1744' class='u'>Tag-idx</a> <a id='1745' tid='1746' class='u'>t2</a>))])))
+
+
+(<a id='769' tid='770' class='u'>define</a> <a id='771' tid='772' class='u'>*escape-table*</a>
+  <a id='773' tid='774' class='u'>&#39;</a>((<a id='775' tid='776' class='u'>#\&quot;</a>  <a id='777' tid='778' class='u'>.</a>   <a id='779' tid='780' class='u'>&quot;&quot;&quot;</a>)
+    (<a id='781' tid='782' class='u'>#\&#39;</a>  <a id='783' tid='784' class='u'>.</a>    <a id='785' tid='786' class='u'>&quot;&#39;&quot;</a>)
+    (<a id='787' tid='788' class='u'>#\&lt;</a>  <a id='789' tid='790' class='u'>.</a>    <a id='791' tid='792' class='u'>&quot;&lt;&quot;</a>)
+    (<a id='793' tid='794' class='u'>#\&gt;</a>  <a id='795' tid='796' class='u'>.</a>    <a id='797' tid='798' class='u'>&quot;&gt;&quot;</a>)
+    ))
+
+
+(<a id='1345' tid='1346' class='u'>define</a> <a id='1347' tid='1348' class='u'>escape</a>
+  (<a id='1349' tid='1350' class='u'>lambda</a> (<a id='1351' tid='1352' class='u'>c</a>)
+    (<a id='1353' tid='1354' class='u'>cond</a>
+     [(<a id='1355' tid='1356' class='u'>assq</a> <a id='1357' tid='1358' class='u'>c</a> <a id='1359' tid='1360' class='u'>*escape-table*</a>) <a id='1361' tid='1362' class='u'>=&gt;</a> <a id='1363' tid='1364' class='u'>cdr</a>]
+     [<a id='1365' tid='1366' class='u'>else</a> (<a id='1367' tid='1368' class='u'>char-&gt;string</a> <a id='1369' tid='1370' class='u'>c</a>)])))
+
+
+
+
+<span class='d'>; getting the base name of a path/file name
+</span><span class='d'>; (base-name &quot;mk/mk-c.scm&quot;) =&gt; mk-c
+</span>(<a id='957' tid='958' class='u'>define</a> <a id='959' tid='960' class='u'>base-name</a>
+  (<a id='961' tid='962' class='u'>lambda</a> (<a id='963' tid='964' class='u'>fn</a>)
+    (<a id='965' tid='966' class='u'>let</a> <a id='967' tid='968' class='u'>loop</a> ([<a id='969' tid='970' class='u'>i</a> (<a id='971' tid='972' class='u'>-</a> (<a id='973' tid='974' class='u'>string-length</a> <a id='975' tid='976' class='u'>fn</a>) <a id='977' tid='978' class='u'>1</a>)]
+               [<a id='979' tid='980' class='u'>start</a> <a id='981' tid='982' class='u'>-1</a>]
+               [<a id='983' tid='984' class='u'>end</a> (<a id='985' tid='986' class='u'>-</a> (<a id='987' tid='988' class='u'>string-length</a> <a id='989' tid='990' class='u'>fn</a>) <a id='991' tid='992' class='u'>1</a>)])
+      (<a id='993' tid='994' class='u'>cond</a>
+       [(<a id='995' tid='996' class='u'>=</a> <a id='997' tid='998' class='u'>i</a> <a id='999' tid='1000' class='u'>0</a>)
+        (<a id='1001' tid='1002' class='u'>substring</a> <a id='1003' tid='1004' class='u'>fn</a> <a id='1005' tid='1006' class='u'>i</a> <a id='1007' tid='1008' class='u'>end</a>)]
+       [(<a id='1009' tid='1010' class='u'>eq?</a> (<a id='1011' tid='1012' class='u'>string-ref</a> <a id='1013' tid='1014' class='u'>fn</a> <a id='1015' tid='1016' class='u'>i</a>) <a id='1017' tid='1018' class='u'>#\.</a>)
+        (<a id='1019' tid='1020' class='u'>loop</a> (<a id='1021' tid='1022' class='u'>sub1</a> <a id='1023' tid='1024' class='u'>i</a>) <a id='1025' tid='1026' class='u'>start</a> <a id='1027' tid='1028' class='u'>i</a>)]
+       [(<a id='1029' tid='1030' class='u'>eq?</a> (<a id='1031' tid='1032' class='u'>string-ref</a> <a id='1033' tid='1034' class='u'>fn</a> <a id='1035' tid='1036' class='u'>i</a>) <a id='1037' tid='1038' class='u'>#\/</a>)
+        (<a id='1039' tid='1040' class='u'>substring</a> <a id='1041' tid='1042' class='u'>fn</a> (<a id='1043' tid='1044' class='u'>add1</a> <a id='1045' tid='1046' class='u'>i</a>) <a id='1047' tid='1048' class='u'>end</a>)]
+       [<a id='1049' tid='1050' class='u'>else</a>
+        (<a id='1051' tid='1052' class='u'>loop</a> (<a id='1053' tid='1054' class='u'>sub1</a> <a id='1055' tid='1056' class='u'>i</a>) <a id='1057' tid='1058' class='u'>start</a> <a id='1059' tid='1060' class='u'>end</a>)]))))
+
+
+
+(<a id='1395' tid='1396' class='u'>define</a> <a id='1397' tid='1398' class='u'>html-header</a>
+  <span class='d'>(lambda (port)
+      (line port &quot;&lt;html&gt;&quot;)
+      (line port &quot;&lt;head&gt;&quot;)
+      (line port &quot;&lt;META http-equiv=\&quot;Content-Type\&quot;&quot;
+                      &quot; content=\&quot;text/html; charset=utf-8\&quot;&gt;&quot;)
+      (line port &quot;&lt;LINK href=\&quot;diff-s.css\&quot;&quot;
+                      &quot; rel=\&quot;stylesheet\&quot; type=\&quot;text/css\&quot;&gt;&quot;)
+      (line port &quot;&lt;script type=\&quot;text/javascript\&quot;&quot;
+                        &quot; src=\&quot;nav-div.js\&quot;&gt;&lt;/script&gt;&quot;)
+      (line port &quot;&lt;/head&gt;&quot;)
+      (line port &quot;&lt;body&gt;&quot;))</span>)
+
+(<a id='1375' tid='1376' class='u'>define</a> <a id='1377' tid='1378' class='u'>html-footer</a>
+  (<a id='1379' tid='1380' class='u'>lambda</a> (<a id='1381' tid='1382' class='u'>port</a>)
+    (<a id='1383' tid='1384' class='u'>line</a> <a id='1385' tid='1386' class='u'>port</a> <a id='1387' tid='1388' class='u'>&quot;&lt;/body&gt;&quot;</a>)
+    (<a id='1389' tid='1390' class='u'>line</a> <a id='1391' tid='1392' class='u'>port</a> <a id='1393' tid='1394' class='u'>&quot;&lt;/html&gt;&quot;</a>)))
+
+
+(<a id='1833' tid='1834' class='u'>define</a> <a id='1835' tid='1836' class='u'>write-html</a>
+  (<a id='1837' tid='1838' class='u'>lambda</a> (<a id='1839' tid='1840' class='u'>port</a> <a id='1841' tid='1842' class='u'>text</a> <a id='1843' tid='1844' class='u'>side</a>)
+    (<a id='1845' tid='1846' class='u'>line</a> <a id='1847' tid='1848' class='u'>port</a> (<a id='1849' tid='1850' class='u'>string-append</a> <a id='1851' tid='1852' class='u'>&quot;&lt;div id=\&quot;&quot;</a> <a id='1853' tid='1854' class='u'>side</a> <a id='1855' tid='1856' class='u'>&quot;\&quot; class=\&quot;src\&quot;&gt;&quot;</a>))
+    (<a id='1857' tid='1858' class='u'>line</a> <a id='1859' tid='1860' class='u'>port</a> <a id='1861' tid='1862' class='u'>&quot;&lt;pre&gt;&quot;</a>)
+    (<a id='1863' tid='1864' class='u'>if</a> (<a id='1865' tid='1866' class='u'>string=?</a> <a id='1867' tid='1868' class='u'>side</a> <a id='1869' tid='1870' class='u'>&quot;left&quot;</a>)
+        (<a id='1871' tid='1872' class='u'>line</a> <a id='1873' tid='1874' class='u'>port</a> <a id='1875' tid='1876' class='u'>&quot;&lt;a id=&#39;leftstart&#39; tid=&#39;rightstart&#39;&gt;&lt;/a&gt;&quot;</a>)
+        (<a id='1877' tid='1878' class='u'>line</a> <a id='1879' tid='1880' class='u'>port</a> <a id='1881' tid='1882' class='u'>&quot;&lt;a id=&#39;rightstart&#39; tid=&#39;leftstart&#39;&gt;&lt;/a&gt;&quot;</a>))
+    (<a id='1883' tid='1884' class='u'>line</a> <a id='1885' tid='1886' class='u'>port</a> <a id='1887' tid='1888' class='u'>text</a>)
+    (<a id='1889' tid='1890' class='u'>line</a> <a id='1891' tid='1892' class='u'>port</a> <a id='1893' tid='1894' class='u'>&quot;&lt;/pre&gt;&quot;</a>)
+    (<a id='1895' tid='1896' class='u'>line</a> <a id='1897' tid='1898' class='u'>port</a> <a id='1899' tid='1900' class='u'>&quot;&lt;/div&gt;&quot;</a>)))
+
+
+<span class='d'>;; progress bar :-)
+</span>(<a id='1123' tid='1124' class='u'>define</a> <a id='1125' tid='1126' class='u'>diff-progress</a>
+  (<a id='1127' tid='1128' class='u'>new-progress</a> <a id='1129' tid='1130' class='u'>10000</a>))
+
+(<a id='1085' tid='1086' class='u'>define</a> <a id='1087' tid='1088' class='u'>cleanup</a>
+  (<a id='1089' tid='1090' class='u'>lambda</a> ()
+    (<a id='1091' tid='1092' class='u'>set!</a> <a id='1093' tid='1094' class='u'>*node-size-hash*</a> (<a id='1095' tid='1096' class='u'>make-hasheq</a>))
+    (<a id='1097' tid='1098' class='u'>set!</a> <a id='1099' tid='1100' class='u'>*diff-hash*</a> (<a id='1101' tid='1102' class='u'>make-hasheq</a>))))
+
+
+<span class='d'>;; main command
+</span>(<a id='1111' tid='1112' class='u'>define</a> <a id='1113' tid='1114' class='u'>diff</a>
+  (<span class='d'>lambda</span> <span class='d'>(file1 file2 parse)</span>
+    <span class='d'>(cleanup)</span>
+    (<span class='d'>letv</span> <span class='d'>([s1 (read-file file1)]
+           [s2 (read-file file2)]
+           [node1 (parse s1)]
+           [node2 (parse s2)]
+           [_ (diff-progress &quot;\nDone parsing&quot;)]
+           [(changes cost) (diff-node node1 node2 0 #f)]
+           [_ (diff-progress &quot;\nDone diffing&quot;)]
+           [changes (closure changes)]
+           [_ (diff-progress &quot;\nDone moving&quot;)]
+           [_ (set! *diff-hash* (make-hasheq))]
+           [ctags1 (change-tags changes &#39;left)]
+           [ctags2 (change-tags changes &#39;right)]
+           [tagged1 (apply-tags s1 ctags1)]
+           [tagged2 (apply-tags s2 ctags2)])</span>
+      (<span class='d'>let*</span> ([<span class='d'>frame-file</span> (<a id='43' tid='44' class='m'>string-append</a> (<a id='45' tid='46' class='m'>base-name</a> <a id='47' tid='48' class='m'>file1</a>) <a id='49' tid='50' class='m'>&quot;-&quot;</a>
+                                        (<a id='51' tid='52' class='m'>base-name</a> <a id='53' tid='54' class='m'>file2</a>) <a id='55' tid='56' class='m'>&quot;.html&quot;</a>)]
+             <span class='d'>[port (open-output-file frame-file
+                                     #:mode &#39;text
+                                     #:exists &#39;replace)]</span>)
+        <span class='d'>(html-header port)</span>
+        <span class='d'>(write-html port tagged1 &quot;left&quot;)</span>
+        <span class='d'>(write-html port tagged2 &quot;right&quot;)</span>
+        <span class='d'>(html-footer port)</span>
+        <span class='d'>(close-output-port port)</span>
+        <span class='d'>(cleanup)</span>))))
+
+
+<span class='d'>; (current-directory &quot;d:/prog/schdiff&quot;)
+</span><span class='d'>; (diff &quot;t2.ss&quot; &quot;diff.ss&quot;)
+</span>
+<span class='d'>; (diff &quot;search.ss&quot; &quot;diff.ss&quot;)
+</span><span class='d'>; (diff &quot;mk.scm&quot; &quot;mk-c.scm&quot;)
+</span>
+<span class='d'>; (current-directory &quot;d:/home/.emacs.d&quot;)
+</span><span class='d'>; (diff &quot;paredit20.el&quot; &quot;paredit22.el&quot;)
+</span>
+
+</pre>
+</div>
+<div id="right" class="src">
+<pre>
+<a id='rightstart' tid='leftstart'></a>
+<span class='i'>;; ydiff - a language-aware tool for comparing programs
+</span><a id='1902' tid='1901' class='u'>;; Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
+</a>
+
+<a id='1904' tid='1903' class='u'>;; This program is free software: you can redistribute it and/or modify
+</a><a id='1906' tid='1905' class='u'>;; it under the terms of the GNU General Public License as published by
+</a><a id='1908' tid='1907' class='u'>;; the Free Software Foundation, either version 3 of the License, or
+</a><a id='1910' tid='1909' class='u'>;; (at your option) any later version.
+</a>
+<a id='1912' tid='1911' class='u'>;; This program is distributed in the hope that it will be useful,
+</a><a id='1914' tid='1913' class='u'>;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+</a><a id='1916' tid='1915' class='u'>;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+</a><a id='1918' tid='1917' class='u'>;; GNU General Public License for more details.
+</a>
+<a id='1920' tid='1919' class='u'>;; You should have received a copy of the GNU General Public License
+</a><a id='1922' tid='1921' class='u'>;; along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.
+</a>
+<span class='i'>#lang</span> <span class='i'>racket</span>
+
+<span class='i'>(require &quot;utils.rkt&quot;)</span>
+<span class='i'>(require &quot;structs.rkt&quot;)</span>
+
+<span class='i'>(provide (all-defined-out))</span>
+
+
+<span class='i'>;-------------------------------------------------------------
+</span><span class='i'>;                      parameters
+</span><span class='i'>;-------------------------------------------------------------
+</span>
+<span class='i'>;; The minimum size of a node to be considered as moved. Shouldn&#39;t be
+</span><span class='i'>;; too small, otherwise small deleted names may appear in a very
+</span><span class='i'>;; distant place!
+</span>(<a id='810' tid='809' class='u'>define</a> <a id='812' tid='811' class='u'>*move-size*</a> <a id='814' tid='813' class='u'>5</a>)
+
+
+<span class='i'>;; How long must a string be in order for us to use string-dist
+</span><span class='i'>;; function, which is costly when used on long strings but the most
+</span><span class='i'>;; accurate method to use. Currently this parameter is set to 0,
+</span><span class='i'>;; effective disables all LCS string comparison. This improves
+</span><span class='i'>;; performance while not sacrificing accuracy because the algorithm is
+</span><span class='i'>;; AST based.
+</span>(<a id='800' tid='799' class='u'>define</a> <a id='802' tid='801' class='u'>*max-string-len*</a> <span class='i'>0</span>)
+
+
+<span class='i'>;; Only memoize the diff of nodes of size larger than this number.
+</span><span class='i'>;; This effectively reduces memory usage.
+</span>(<a id='804' tid='803' class='u'>define</a> <a id='806' tid='805' class='u'>*memo-node-size*</a> <a id='808' tid='807' class='u'>2</a>)
+
+
+
+
+
+<span class='i'>;-------------------------------------------------------------
+</span><span class='i'>;                      data types
+</span><span class='i'>;-------------------------------------------------------------
+</span>
+<span class='i'>;; Change - a change in the data structure
+</span><span class='i'>;; - old  : the old version, #f for insertions
+</span><span class='i'>;; - new  : the new version, #f for deletions
+</span><span class='i'>;; - cost : the cost of change from old to new
+</span><span class='i'>;; - type : insertion, deletion, or modification?
+</span><span class='i'>(struct Change (old new cost type) #:transparent)</span>
+
+<span class='i'>;; HTML tag structure used HTML generation code
+</span>(<a id='1924' tid='1923' class='u'>struct</a> <a id='1926' tid='1925' class='u'>Tag</a> (<a id='1928' tid='1927' class='u'>tag</a> <a id='1930' tid='1929' class='u'>idx</a> <a id='1932' tid='1931' class='u'>start</a>) <a id='1934' tid='1933' class='u'>#:transparent</a>)
+
+(<a id='1400' tid='1399' class='u'>define</a> <a id='1402' tid='1401' class='u'>ins?</a>
+  <span class='i'>(lambda (c)
+    (eq? &#39;ins (Change-type c)))</span>)
+
+(<a id='1108' tid='1107' class='u'>define</a> <a id='1110' tid='1109' class='u'>del?</a>
+  <span class='i'>(lambda (c)
+    (eq? &#39;del (Change-type c)))</span>)
+
+(<a id='1536' tid='1535' class='u'>define</a> <a id='1538' tid='1537' class='u'>mod?</a>
+  <span class='i'>(lambda (c)
+    (eq? &#39;mod (Change-type c)))</span>)
+
+
+
+<a id='1936' tid='1935' class='u'>;----------------- utils for creating changes ----------------
+</a>(<span class='i'>define</span> <span class='i'>ins</span>
+  (<a id='426' tid='425' class='m'>lambda</a> (<a id='428' tid='427' class='m'>node</a>)
+    (<a id='430' tid='429' class='m'>let</a> ([<a id='432' tid='431' class='m'>size</a> (<a id='434' tid='433' class='m'>node-size</a> <a id='436' tid='435' class='m'>node</a>)])
+      (<a id='438' tid='437' class='m'>list</a> (<a id='440' tid='439' class='m'>Change</a> <a id='442' tid='441' class='m'>#f</a> <a id='444' tid='443' class='m'>node</a> <a id='446' tid='445' class='m'>size</a> <a id='448' tid='447' class='m'>&#39;</a><a id='450' tid='449' class='m'>ins</a>)))))
+
+
+(<span class='i'>define</span> <span class='i'>del</span>
+  (<a id='390' tid='389' class='m'>lambda</a> (<a id='392' tid='391' class='m'>node</a>)
+    (<a id='394' tid='393' class='m'>let</a> ([<a id='396' tid='395' class='m'>size</a> (<a id='398' tid='397' class='m'>node-size</a> <a id='400' tid='399' class='m'>node</a>)])
+      (<a id='402' tid='401' class='m'>list</a> (<a id='404' tid='403' class='m'>Change</a> <a id='406' tid='405' class='m'>node</a> <a id='408' tid='407' class='m'>#f</a> <a id='410' tid='409' class='m'>size</a> <a id='412' tid='411' class='m'>&#39;</a><a id='414' tid='413' class='m'>del</a>)))))
+
+
+(<span class='i'>define</span> <span class='i'>mod</span>
+  (<a id='452' tid='451' class='m'>lambda</a> (<a id='454' tid='453' class='m'>node1</a> <a id='456' tid='455' class='m'>node2</a> <a id='458' tid='457' class='m'>cost</a>)
+    (<a id='460' tid='459' class='m'>list</a> (<a id='462' tid='461' class='m'>Change</a> <a id='464' tid='463' class='m'>node1</a> <a id='466' tid='465' class='m'>node2</a> <a id='468' tid='467' class='m'>cost</a> <a id='470' tid='469' class='m'>&#39;</a><a id='472' tid='471' class='m'>mod</a>))))
+
+
+(<span class='i'>define</span> <span class='i'>mov</span>
+  (<a id='474' tid='473' class='m'>lambda</a> (<a id='476' tid='475' class='m'>node1</a> <a id='478' tid='477' class='m'>node2</a> <a id='480' tid='479' class='m'>cost</a>)
+    (<a id='482' tid='481' class='m'>list</a> (<a id='484' tid='483' class='m'>Change</a> <a id='486' tid='485' class='m'>node1</a> <a id='488' tid='487' class='m'>node2</a> <a id='490' tid='489' class='m'>cost</a> <a id='492' tid='491' class='m'>&#39;</a><a id='494' tid='493' class='m'>mov</a>))))
+
+
+<span class='i'>;; create a &quot;total change&quot;
+</span><span class='i'>;; (delete node1 completely and then insert node2)
+</span>(<a id='1748' tid='1747' class='u'>define</a> <a id='1750' tid='1749' class='u'>total</a>
+  (<a id='496' tid='495' class='m'>lambda</a> (<a id='498' tid='497' class='m'>node1</a> <a id='500' tid='499' class='m'>node2</a>)
+    (<span class='i'>let</span> ([<a id='502' tid='501' class='m'>size1</a> (<a id='504' tid='503' class='m'>node-size</a> <a id='506' tid='505' class='m'>node1</a>)]
+          [<a id='508' tid='507' class='m'>size2</a> (<a id='510' tid='509' class='m'>node-size</a> <a id='512' tid='511' class='m'>node2</a>)])
+      <span class='i'>(values (append (del node1) (ins node2))
+              (+ size1 size2))</span>)))
+
+
+<span class='i'>;; temporary workaround before the algorithm stablizes
+</span>(<a id='1496' tid='1495' class='u'>define</a> <a id='1498' tid='1497' class='u'>mod-&gt;mov</a>
+  (<a id='1500' tid='1499' class='u'>lambda</a> (<a id='1502' tid='1501' class='u'>c</a>)
+    (<a id='1504' tid='1503' class='u'>match</a> <a id='1506' tid='1505' class='u'>c</a>
+     [(<a id='1508' tid='1507' class='u'>Change</a> <a id='1510' tid='1509' class='u'>node1</a> <a id='1512' tid='1511' class='u'>node2</a> <a id='1514' tid='1513' class='u'>cost</a> <a id='1516' tid='1515' class='u'>&#39;</a><a id='1518' tid='1517' class='u'>mod</a>)
+      (<a id='1520' tid='1519' class='u'>Change</a> <a id='1522' tid='1521' class='u'>node1</a> <a id='1524' tid='1523' class='u'>node2</a> <a id='1526' tid='1525' class='u'>cost</a> <a id='1528' tid='1527' class='u'>&#39;</a><a id='1530' tid='1529' class='u'>mov</a>)]
+     [<a id='1532' tid='1531' class='u'>other</a> <a id='1534' tid='1533' class='u'>other</a>])))
+
+
+
+<span class='i'>;;------------------ frames utils --------------------
+</span><span class='i'>(define deframe
+  (lambda (node)
+    (match node
+      [(Node &#39;frame _ _ elts)
+       (apply append (map deframe elts))]
+     [else (list node)])))</span>
+
+
+<span class='i'>(define deframe-change
+  (lambda (change)
+    (cond
+     [(ins? change)
+      (apply append
+             (map ins (deframe (Change-new change))))]
+     [(del? change)
+      (apply append
+             (map del (deframe (Change-old change))))]
+     [else (list change)])))</span>
+
+
+(<a id='1372' tid='1371' class='u'>define</a> <a id='1374' tid='1373' class='u'>extract-frame</a>
+  (<span class='i'>lambda</span> <span class='i'>(node1 node2 type)</span>
+    (<span class='i'>match</span> <span class='i'>node1</span>
+      [<span class='i'>(Node type1 start1 end1 elts1)</span>
+       (<span class='i'>let</span> ([<a id='514' tid='513' class='m'>frame-elts</a> (<a id='516' tid='515' class='m'>filter</a> (<a id='518' tid='517' class='m'>lambda</a> (<a id='520' tid='519' class='m'>x</a>)
+                                   (<a id='522' tid='521' class='m'>not</a> (<a id='524' tid='523' class='m'>eq?</a> <a id='526' tid='525' class='m'>x</a> <a id='528' tid='527' class='m'>node2</a>)))
+                                 <a id='530' tid='529' class='m'>elts1</a>)])
+         <span class='i'>(type (Node &#39;frame start1 start1 frame-elts))</span>)]
+      <span class='i'>[_ fatal &#39;extract-frame &quot;I only accept Node&quot;]</span>)))
+
+
+<span class='i'>;; (define n1 (Token &quot;ok&quot; 0 1))
+</span><span class='i'>;; (define n2 (Expr &#39;ok 0 2 (list n1 (Token &quot;bar&quot; 1 2))))
+</span><span class='i'>;; (map deframe-change (extract-frame n2 n1 ins))
+</span>
+
+
+
+
+
+<span class='i'>;------------------ operations on nodes ---------------------
+</span>
+<span class='i'>;; &quot;virtual function&quot; - get definition name
+</span><span class='i'>;; can be overridden by individual languages
+</span><span class='i'>(define get-name (lambda (node) #f))</span>
+
+<span class='i'>(define set-get-name
+  (lambda (fun)
+    (set! get-name fun)))</span>
+
+
+<span class='i'>;; &quot;virtual function&quot; - get node type
+</span><span class='i'>;; can be overridden by individual languages
+</span><span class='i'>(define get-type Node-type)</span>
+
+<span class='i'>(define set-get-type
+  (lambda (fun)
+    (set! get-type fun)))</span>
+
+
+<span class='i'>;; same-def? only depend on get-name, so they need not be overridden
+</span><span class='i'>;; by individual languages.
+</span>(<a id='1556' tid='1555' class='u'>define</a> <a id='1558' tid='1557' class='u'>same-def?</a>
+  <span class='i'>(lambda (e1 e2)
+    (cond
+     [(not (eq? (get-type e1) (get-type e2)))
+      #f]
+     [else
+      (let ([name1 (get-name e1)]
+            [name2 (get-name e2)])
+        (and name1 name2 (equal? name1 name2)))]))</span>)
+
+
+<span class='i'>(define set-same-def
+  (lambda (fun)
+    (set! same-def? fun)))</span>
+
+
+
+<span class='i'>;----------- node size function ------------
+</span>(<a id='816' tid='815' class='u'>define</a> <a id='818' tid='817' class='u'>*node-size-hash*</a> (<a id='820' tid='819' class='u'>make-hasheq</a>))
+
+(<a id='1544' tid='1543' class='u'>define</a> <a id='1546' tid='1545' class='u'>node-size</a>
+  (<a id='560' tid='559' class='m'>lambda</a> (<a id='562' tid='561' class='m'>node</a>)
+    (<a id='532' tid='531' class='m'>define</a> <a id='534' tid='533' class='m'>memo</a>
+      (<a id='536' tid='535' class='m'>lambda</a> (<a id='538' tid='537' class='m'>v</a>)
+        (<a id='540' tid='539' class='m'>if</a> (<a id='542' tid='541' class='m'>&gt;</a> <a id='544' tid='543' class='m'>v</a> <a id='546' tid='545' class='m'>1</a>)
+            (<a id='548' tid='547' class='m'>hash-set!</a> <a id='550' tid='549' class='m'>*node-size-hash*</a> <a id='552' tid='551' class='m'>node</a> <a id='554' tid='553' class='m'>v</a>)
+            (<a id='556' tid='555' class='m'>void</a>))
+        <a id='558' tid='557' class='m'>v</a>))
+    (<span class='i'>cond</span>
+     [(<a id='564' tid='563' class='m'>pair?</a> <a id='566' tid='565' class='m'>node</a>)
+      (<a id='568' tid='567' class='m'>apply</a> <a id='570' tid='569' class='m'>+</a> (<a id='572' tid='571' class='m'>map</a> <a id='574' tid='573' class='m'>node-size</a> <a id='576' tid='575' class='m'>node</a>))]
+     <span class='i'>[(or (token? node) (str? node) (character? node)) 1]</span>
+     [<span class='i'>(Node? node)</span>
+      (<span class='i'>cond</span>
+       [(<a id='166' tid='165' class='m'>hash-has-key?</a> <a id='168' tid='167' class='m'>*node-size-hash*</a> <a id='170' tid='169' class='m'>node</a>)
+        (<a id='172' tid='171' class='m'>hash-ref</a> <a id='174' tid='173' class='m'>*node-size-hash*</a> <a id='176' tid='175' class='m'>node</a>)]
+       <span class='i'>[else
+        (memo (node-size (Node-elts node)))]</span>)]
+     <span class='i'>[else 0]</span>)))
+
+
+(<a id='1540' tid='1539' class='u'>define</a> <a id='1542' tid='1541' class='u'>node-depth</a>
+  (<a id='578' tid='577' class='m'>lambda</a> (<a id='580' tid='579' class='m'>node</a>)
+    (<span class='i'>cond</span>
+     <span class='i'>[(null? node) 0]</span>
+     [(<a id='582' tid='581' class='m'>pair?</a> <a id='584' tid='583' class='m'>node</a>)
+      (<a id='586' tid='585' class='m'>apply</a> <a id='588' tid='587' class='m'>max</a> (<a id='590' tid='589' class='m'>map</a> <a id='592' tid='591' class='m'>node-depth</a> <a id='594' tid='593' class='m'>node</a>))]
+     <span class='i'>[(Node? node)
+      (add1 (node-depth (Node-elts node)))]</span>
+     <span class='i'>[else 0]</span>)))
+
+
+<span class='i'>; (node-depth (parse-scheme &quot;(lambda (x (x (y)) (y)) x)&quot;))
+</span>
+
+(<a id='1752' tid='1751' class='u'>define</a> <a id='1754' tid='1753' class='u'>uid</a>
+  (<a id='1756' tid='1755' class='u'>let</a> ([<a id='1758' tid='1757' class='u'>count</a> <a id='1760' tid='1759' class='u'>1</a>]
+        [<a id='1762' tid='1761' class='u'>table</a> (<a id='1764' tid='1763' class='u'>box</a> <a id='1766' tid='1765' class='u'>&#39;</a>())])
+    (<a id='1768' tid='1767' class='u'>lambda</a> (<a id='1770' tid='1769' class='u'>node</a>)
+      (<a id='1772' tid='1771' class='u'>let</a> ([<a id='1774' tid='1773' class='u'>p</a> (<a id='1776' tid='1775' class='u'>assq</a> <a id='1778' tid='1777' class='u'>node</a> (<a id='1780' tid='1779' class='u'>unbox</a> <a id='1782' tid='1781' class='u'>table</a>))])
+        (<a id='1784' tid='1783' class='u'>cond</a>
+         [(<a id='1786' tid='1785' class='u'>not</a> <a id='1788' tid='1787' class='u'>p</a>)
+          (<a id='1790' tid='1789' class='u'>let</a> ([<a id='1792' tid='1791' class='u'>id</a> <a id='1794' tid='1793' class='u'>count</a>])
+            (<a id='1796' tid='1795' class='u'>set!</a> <a id='1798' tid='1797' class='u'>count</a> (<a id='1800' tid='1799' class='u'>add1</a> <a id='1802' tid='1801' class='u'>count</a>))
+            (<a id='1804' tid='1803' class='u'>set-box!</a> <a id='1806' tid='1805' class='u'>table</a> (<a id='1808' tid='1807' class='u'>cons</a> <a id='1810' tid='1809' class='u'>`</a>(<a id='1812' tid='1811' class='u'>,</a><a id='1814' tid='1813' class='u'>node</a> <a id='1816' tid='1815' class='u'>.</a> <a id='1818' tid='1817' class='u'>,</a><a id='1820' tid='1819' class='u'>id</a>) (<a id='1822' tid='1821' class='u'>unbox</a> <a id='1824' tid='1823' class='u'>table</a>)))
+            <a id='1826' tid='1825' class='u'>id</a>)]
+         [<a id='1828' tid='1827' class='u'>else</a>
+          (<a id='1830' tid='1829' class='u'>cdr</a> <a id='1832' tid='1831' class='u'>p</a>)])))))
+
+
+
+<span class='i'>;; similarity string from a change
+</span>(<a id='1560' tid='1559' class='u'>define</a> <a id='1562' tid='1561' class='u'>similarity</a>
+  (<a id='596' tid='595' class='m'>lambda</a> (<a id='598' tid='597' class='m'>change</a>)
+    (<span class='i'>let</span> <span class='i'>([total (+ (node-size (Change-old change))
+                    (node-size (Change-new change)))])</span>
+      (<a id='600' tid='599' class='m'>cond</a>
+       [(<a id='602' tid='601' class='m'>or</a> (<a id='604' tid='603' class='m'>=</a> <a id='606' tid='605' class='m'>0</a> <a id='608' tid='607' class='m'>total</a>) (<a id='610' tid='609' class='m'>=</a> <a id='612' tid='611' class='m'>0</a> (<a id='614' tid='613' class='m'>Change-cost</a> <a id='616' tid='615' class='m'>change</a>)))
+        <a id='618' tid='617' class='m'>&quot;100%&quot;</a>]
+       [<a id='620' tid='619' class='m'>else</a>
+        (<a id='622' tid='621' class='m'>string-append</a>
+         (<a id='624' tid='623' class='m'>real-&gt;decimal-string</a>
+          (<a id='626' tid='625' class='m'>*</a> <a id='628' tid='627' class='m'>100</a> (<a id='630' tid='629' class='m'>-</a> <a id='632' tid='631' class='m'>1.0</a> (<a id='634' tid='633' class='m'>/</a> (<a id='636' tid='635' class='m'>Change-cost</a> <a id='638' tid='637' class='m'>change</a>) <a id='640' tid='639' class='m'>total</a>))) <a id='642' tid='641' class='m'>1</a>)
+         <a id='644' tid='643' class='m'>&quot;%&quot;</a>)]))))
+
+
+
+<span class='i'>;-------------------------------------------------------------
+</span><span class='i'>;                       diff proper
+</span><a id='1938' tid='1937' class='u'>;-------------------------------------------------------------
+</a>
+<span class='i'>; 2-D memoization table
+</span>(<a id='1434' tid='1433' class='u'>define</a> <a id='1436' tid='1435' class='u'>make-table</a>
+  (<a id='1438' tid='1437' class='u'>lambda</a> (<a id='1440' tid='1439' class='u'>dim1</a> <a id='1442' tid='1441' class='u'>dim2</a>)
+    (<a id='1444' tid='1443' class='u'>let</a> ([<a id='1446' tid='1445' class='u'>vec</a> (<a id='1448' tid='1447' class='u'>make-vector</a> (<a id='1450' tid='1449' class='u'>add1</a> <a id='1452' tid='1451' class='u'>dim1</a>))])
+      (<a id='1454' tid='1453' class='u'>let</a> <a id='1456' tid='1455' class='u'>loop</a> ([<a id='1458' tid='1457' class='u'>n</a> <a id='1460' tid='1459' class='u'>0</a>])
+        (<a id='1462' tid='1461' class='u'>cond</a>
+         [(<a id='1464' tid='1463' class='u'>=</a> <a id='1466' tid='1465' class='u'>n</a> (<a id='1468' tid='1467' class='u'>vector-length</a> <a id='1470' tid='1469' class='u'>vec</a>)) <a id='1472' tid='1471' class='u'>vec</a>]
+         [<a id='1474' tid='1473' class='u'>else</a>
+          (<a id='1476' tid='1475' class='u'>vector-set!</a> <a id='1478' tid='1477' class='u'>vec</a> <a id='1480' tid='1479' class='u'>n</a> (<a id='1482' tid='1481' class='u'>make-vector</a> (<a id='1484' tid='1483' class='u'>add1</a> <a id='1486' tid='1485' class='u'>dim2</a>) <a id='1488' tid='1487' class='u'>#f</a>))
+          (<a id='1490' tid='1489' class='u'>loop</a> (<a id='1492' tid='1491' class='u'>add1</a> <a id='1494' tid='1493' class='u'>n</a>))])))))
+
+
+(<a id='1644' tid='1643' class='u'>define</a> <a id='1646' tid='1645' class='u'>table-ref</a>
+  (<a id='1648' tid='1647' class='u'>lambda</a> (<a id='1650' tid='1649' class='u'>t</a> <a id='1652' tid='1651' class='u'>x</a> <a id='1654' tid='1653' class='u'>y</a>)
+    (<a id='1656' tid='1655' class='u'>let</a> ([<a id='1658' tid='1657' class='u'>row</a> (<a id='1660' tid='1659' class='u'>vector-ref</a> <a id='1662' tid='1661' class='u'>t</a> <a id='1664' tid='1663' class='u'>x</a>)])
+      (<a id='1666' tid='1665' class='u'>vector-ref</a> <a id='1668' tid='1667' class='u'>row</a> <a id='1670' tid='1669' class='u'>y</a>))))
+
+
+(<a id='1672' tid='1671' class='u'>define</a> <a id='1674' tid='1673' class='u'>table-set!</a>
+  (<a id='1676' tid='1675' class='u'>lambda</a> (<a id='1678' tid='1677' class='u'>t</a> <a id='1680' tid='1679' class='u'>x</a> <a id='1682' tid='1681' class='u'>y</a> <a id='1684' tid='1683' class='u'>v</a>)
+    (<a id='1686' tid='1685' class='u'>let</a> ([<a id='1688' tid='1687' class='u'>row</a> (<a id='1690' tid='1689' class='u'>vector-ref</a> <a id='1692' tid='1691' class='u'>t</a> <a id='1694' tid='1693' class='u'>x</a>)])
+      (<a id='1696' tid='1695' class='u'>vector-set!</a> <a id='1698' tid='1697' class='u'>row</a> <a id='1700' tid='1699' class='u'>y</a> <a id='1702' tid='1701' class='u'>v</a>))))
+
+
+
+<span class='i'>;---------------- string distance function -----------------
+</span>
+<span class='i'>;; string distance is no longer used because string=? saffice to
+</span><span class='i'>;; compare strings in ASTs. Retain it here for possible later uses.
+</span>(<a id='1568' tid='1567' class='u'>define</a> <a id='1570' tid='1569' class='u'>string-dist</a>
+  (<a id='1572' tid='1571' class='u'>lambda</a> (<a id='1574' tid='1573' class='u'>s1</a> <a id='1576' tid='1575' class='u'>s2</a>)
+    (<a id='1578' tid='1577' class='u'>let*</a> ([<a id='1580' tid='1579' class='u'>len1</a> (<a id='1582' tid='1581' class='u'>string-length</a> <a id='1584' tid='1583' class='u'>s1</a>)]
+           [<a id='1586' tid='1585' class='u'>len2</a> (<a id='1588' tid='1587' class='u'>string-length</a> <a id='1590' tid='1589' class='u'>s2</a>)]
+           [<a id='1592' tid='1591' class='u'>t</a> (<a id='1594' tid='1593' class='u'>make-table</a> <a id='1596' tid='1595' class='u'>len1</a> <a id='1598' tid='1597' class='u'>len2</a>)]
+           [<a id='1600' tid='1599' class='u'>char-dist</a> (<a id='1602' tid='1601' class='u'>dist1</a> <a id='1604' tid='1603' class='u'>t</a> <a id='1606' tid='1605' class='u'>s1</a> <a id='1608' tid='1607' class='u'>0</a> <a id='1610' tid='1609' class='u'>s2</a> <a id='1612' tid='1611' class='u'>0</a>)])
+      (<a id='1614' tid='1613' class='u'>cond</a>
+       [(<a id='1616' tid='1615' class='u'>=</a> <a id='1618' tid='1617' class='u'>0</a> (<a id='1620' tid='1619' class='u'>+</a> <a id='1622' tid='1621' class='u'>len1</a> <a id='1624' tid='1623' class='u'>len2</a>)) <a id='1626' tid='1625' class='u'>0</a>]
+       [<a id='1628' tid='1627' class='u'>else</a>
+        (<a id='1630' tid='1629' class='u'>/</a> (<a id='1632' tid='1631' class='u'>*</a> <a id='1634' tid='1633' class='u'>2.0</a> <a id='1636' tid='1635' class='u'>char-dist</a>) (<a id='1638' tid='1637' class='u'>+</a> <a id='1640' tid='1639' class='u'>len1</a> <a id='1642' tid='1641' class='u'>len2</a>))]))))
+
+
+(<a id='1136' tid='1135' class='u'>define</a> <a id='1138' tid='1137' class='u'>dist1</a>
+  (<a id='1160' tid='1159' class='u'>lambda</a> (<a id='1162' tid='1161' class='u'>table</a> <a id='1164' tid='1163' class='u'>s1</a> <a id='1166' tid='1165' class='u'>start1</a> <a id='1168' tid='1167' class='u'>s2</a> <a id='1170' tid='1169' class='u'>start2</a>)
+    (<a id='1140' tid='1139' class='u'>define</a> <a id='1142' tid='1141' class='u'>memo</a>
+      (<a id='1144' tid='1143' class='u'>lambda</a> (<a id='1146' tid='1145' class='u'>value</a>)
+        (<a id='1148' tid='1147' class='u'>table-set!</a> <a id='1150' tid='1149' class='u'>table</a> <a id='1152' tid='1151' class='u'>start1</a> <a id='1154' tid='1153' class='u'>start2</a> <a id='1156' tid='1155' class='u'>value</a>)
+        <a id='1158' tid='1157' class='u'>value</a>))
+    (<a id='1172' tid='1171' class='u'>cond</a>
+     [(<a id='1174' tid='1173' class='u'>table-ref</a> <a id='1176' tid='1175' class='u'>table</a> <a id='1178' tid='1177' class='u'>start1</a> <a id='1180' tid='1179' class='u'>start2</a>)
+      <a id='1182' tid='1181' class='u'>=&gt;</a> (<a id='1184' tid='1183' class='u'>lambda</a> (<a id='1186' tid='1185' class='u'>cached</a>) <a id='1188' tid='1187' class='u'>cached</a>)]
+     [(<a id='1190' tid='1189' class='u'>=</a> <a id='1192' tid='1191' class='u'>start1</a> (<a id='1194' tid='1193' class='u'>string-length</a> <a id='1196' tid='1195' class='u'>s1</a>))
+      (<a id='1198' tid='1197' class='u'>memo</a> (<a id='1200' tid='1199' class='u'>-</a> (<a id='1202' tid='1201' class='u'>string-length</a> <a id='1204' tid='1203' class='u'>s2</a>) <a id='1206' tid='1205' class='u'>start2</a>))]
+     [(<a id='1208' tid='1207' class='u'>=</a> <a id='1210' tid='1209' class='u'>start2</a> (<a id='1212' tid='1211' class='u'>string-length</a> <a id='1214' tid='1213' class='u'>s2</a>))
+      (<a id='1216' tid='1215' class='u'>memo</a> (<a id='1218' tid='1217' class='u'>-</a> (<a id='1220' tid='1219' class='u'>string-length</a> <a id='1222' tid='1221' class='u'>s1</a>) <a id='1224' tid='1223' class='u'>start1</a>))]
+     [<a id='1226' tid='1225' class='u'>else</a>
+      (<a id='1228' tid='1227' class='u'>let*</a> ([<a id='1230' tid='1229' class='u'>c1</a> (<a id='1232' tid='1231' class='u'>string-ref</a> <a id='1234' tid='1233' class='u'>s1</a> <a id='1236' tid='1235' class='u'>start1</a>)]
+             [<a id='1238' tid='1237' class='u'>c2</a> (<a id='1240' tid='1239' class='u'>string-ref</a> <a id='1242' tid='1241' class='u'>s2</a> <a id='1244' tid='1243' class='u'>start2</a>)]
+             [<a id='1246' tid='1245' class='u'>d0</a> (<a id='1248' tid='1247' class='u'>cond</a>
+                  [(<a id='1250' tid='1249' class='u'>char=?</a> <a id='1252' tid='1251' class='u'>c1</a> <a id='1254' tid='1253' class='u'>c2</a>) <a id='1256' tid='1255' class='u'>0</a>]
+                  [(<a id='1258' tid='1257' class='u'>char=?</a> (<a id='1260' tid='1259' class='u'>char-downcase</a> <a id='1262' tid='1261' class='u'>c1</a>)
+                           (<a id='1264' tid='1263' class='u'>char-downcase</a> <a id='1266' tid='1265' class='u'>c2</a>)) <a id='1268' tid='1267' class='u'>1</a>]
+                  [<a id='1270' tid='1269' class='u'>else</a> <a id='1272' tid='1271' class='u'>2</a>])]
+             [<a id='1274' tid='1273' class='u'>d1</a> (<a id='1276' tid='1275' class='u'>+</a> <a id='1278' tid='1277' class='u'>d0</a> (<a id='1280' tid='1279' class='u'>dist1</a> <a id='1282' tid='1281' class='u'>table</a> <a id='1284' tid='1283' class='u'>s1</a> (<a id='1286' tid='1285' class='u'>add1</a> <a id='1288' tid='1287' class='u'>start1</a>) <a id='1290' tid='1289' class='u'>s2</a> (<a id='1292' tid='1291' class='u'>add1</a> <a id='1294' tid='1293' class='u'>start2</a>)))]
+             [<a id='1296' tid='1295' class='u'>d2</a> (<a id='1298' tid='1297' class='u'>+</a> <a id='1300' tid='1299' class='u'>1</a> (<a id='1302' tid='1301' class='u'>dist1</a> <a id='1304' tid='1303' class='u'>table</a> <a id='1306' tid='1305' class='u'>s1</a> (<a id='1308' tid='1307' class='u'>add1</a> <a id='1310' tid='1309' class='u'>start1</a>) <a id='1312' tid='1311' class='u'>s2</a> <a id='1314' tid='1313' class='u'>start2</a>))]
+             [<a id='1316' tid='1315' class='u'>d3</a> (<a id='1318' tid='1317' class='u'>+</a> <a id='1320' tid='1319' class='u'>1</a> (<a id='1322' tid='1321' class='u'>dist1</a> <a id='1324' tid='1323' class='u'>table</a> <a id='1326' tid='1325' class='u'>s1</a> <a id='1328' tid='1327' class='u'>start1</a> <a id='1330' tid='1329' class='u'>s2</a> (<a id='1332' tid='1331' class='u'>add1</a> <a id='1334' tid='1333' class='u'>start2</a>)))])
+        (<a id='1336' tid='1335' class='u'>memo</a> (<a id='1338' tid='1337' class='u'>min</a> <a id='1340' tid='1339' class='u'>d1</a> <a id='1342' tid='1341' class='u'>d2</a> <a id='1344' tid='1343' class='u'>d3</a>)))])))
+
+
+
+
+
+<span class='i'>;--------------------- the primary diff function -------------------
+</span>(<a id='1120' tid='1119' class='u'>define</a> <a id='1122' tid='1121' class='u'>diff-node</a>
+  (<span class='i'>lambda</span> <span class='i'>(node1 node2 move?)</span>
+
+    (<a id='646' tid='645' class='m'>define</a> <a id='648' tid='647' class='m'>memo</a>
+      (<a id='650' tid='649' class='m'>lambda</a> (<a id='652' tid='651' class='m'>v1</a> <a id='654' tid='653' class='m'>v2</a>)
+        (<a id='200' tid='199' class='m'>and</a> (<a id='202' tid='201' class='m'>&gt;</a> (<a id='204' tid='203' class='m'>node-size</a> <a id='206' tid='205' class='m'>node1</a>) <a id='208' tid='207' class='m'>*memo-node-size*</a>)
+             (<a id='210' tid='209' class='m'>&gt;</a> (<a id='212' tid='211' class='m'>node-size</a> <a id='214' tid='213' class='m'>node2</a>) <a id='216' tid='215' class='m'>*memo-node-size*</a>)
+             (<a id='656' tid='655' class='m'>hash-put!</a> <a id='658' tid='657' class='m'>*diff-hash*</a> <a id='660' tid='659' class='m'>node1</a> <a id='662' tid='661' class='m'>node2</a> (<a id='664' tid='663' class='m'>cons</a> <a id='666' tid='665' class='m'>v1</a> <a id='668' tid='667' class='m'>v2</a>)))
+        (<a id='670' tid='669' class='m'>values</a> <a id='672' tid='671' class='m'>v1</a> <a id='674' tid='673' class='m'>v2</a>)))
+
+    (<span class='i'>define</span> <span class='i'>try-extract</span>
+      (<span class='i'>lambda</span> <span class='i'>(changes cost)</span>
+        (<span class='i'>cond</span>
+         <span class='i'>[(or (not move?)
+              (zero? cost))
+          (memo changes cost)]</span>
+         [<a id='178' tid='177' class='m'>else</a>
+          (<span class='i'>letv</span> <span class='i'>([(m c) (diff-extract node1 node2 move?)])</span>
+            (<a id='180' tid='179' class='m'>cond</a>
+             [(<a id='182' tid='181' class='m'>not</a> <a id='184' tid='183' class='m'>m</a>)
+              (<a id='186' tid='185' class='m'>memo</a> <a id='188' tid='187' class='m'>changes</a> <a id='190' tid='189' class='m'>cost</a>)]
+             [<a id='192' tid='191' class='m'>else</a>
+              (<a id='194' tid='193' class='m'>memo</a> <a id='196' tid='195' class='m'>m</a> <a id='198' tid='197' class='m'>c</a>)]))])))
+
+
+    <span class='i'>(diff-progress 1)</span> <span class='i'>;; progress bar
+</span>
+    (<span class='i'>cond</span>
+     [(<a id='230' tid='229' class='m'>hash-get</a> <a id='232' tid='231' class='m'>*diff-hash*</a> <a id='234' tid='233' class='m'>node1</a> <a id='236' tid='235' class='m'>node2</a>)
+      <a id='238' tid='237' class='m'>=&gt;</a> (<a id='334' tid='333' class='m'>lambda</a> (<a id='336' tid='335' class='m'>cached</a>)
+           (<a id='338' tid='337' class='m'>values</a> (<a id='340' tid='339' class='m'>car</a> <a id='342' tid='341' class='m'>cached</a>) (<a id='344' tid='343' class='m'>cdr</a> <a id='346' tid='345' class='m'>cached</a>)))]
+     <span class='i'>[(and (character? node1) (character? node2))
+      (diff-string (char-&gt;string (Node-elts node1))
+                   (char-&gt;string (Node-elts node2))
+                   node1 node2)]</span>
+     <span class='i'>[(and (str? node1) (str? node2))
+      (diff-string (Node-elts node1) (Node-elts node2) node1 node2)]</span>
+     <span class='i'>[(and (comment? node1) (comment? node2))
+      (diff-string (Node-elts node1) (Node-elts node2) node1 node2)]</span>
+     <span class='i'>[(and (token? node1) (token? node2))
+      (diff-string (Node-elts node1) (Node-elts node2) node1 node2)]</span>
+     <span class='i'>[(and (Node? node1) (Node? node2)
+           (eq? (get-type node1) (get-type node2)))
+      (letv ([(m c) (diff-list (Node-elts node1) (Node-elts node2) move?)])
+        (try-extract m c))]</span>
+     [(<a id='218' tid='217' class='m'>and</a> (<a id='220' tid='219' class='m'>pair?</a> <a id='222' tid='221' class='m'>node1</a>) (<a id='224' tid='223' class='m'>not</a> (<a id='226' tid='225' class='m'>pair?</a> <a id='228' tid='227' class='m'>node2</a>)))
+      <span class='i'>(diff-list node1 (list node2) move?)</span>]
+     [(<a id='58' tid='57' class='m'>and</a> (<a id='60' tid='59' class='m'>not</a> (<a id='62' tid='61' class='m'>pair?</a> <a id='64' tid='63' class='m'>node1</a>)) (<a id='66' tid='65' class='m'>pair?</a> <a id='68' tid='67' class='m'>node2</a>))
+      <span class='i'>(diff-list (list node1) node2 move?)</span>]
+     [(<a id='82' tid='81' class='m'>and</a> (<a id='84' tid='83' class='m'>pair?</a> <a id='86' tid='85' class='m'>node1</a>) (<a id='88' tid='87' class='m'>pair?</a> <a id='90' tid='89' class='m'>node2</a>))
+      <span class='i'>(diff-list node1 node2 move?)</span>]
+     [<a id='2' tid='1' class='m'>else</a>
+      (<span class='i'>letv</span> ([(<a id='4' tid='3' class='m'>m</a> <a id='6' tid='5' class='m'>c</a>) (<a id='8' tid='7' class='m'>total</a> <a id='10' tid='9' class='m'>node1</a> <a id='12' tid='11' class='m'>node2</a>)])
+        <span class='i'>(try-extract m c)</span>)])))
+
+
+
+
+<span class='i'>;; helper for nodes with string contents (Str, Comment, Token etc.)
+</span>(<a id='1132' tid='1131' class='u'>define</a> <a id='1134' tid='1133' class='u'>diff-string</a>
+  (<a id='92' tid='91' class='m'>lambda</a> (<a id='94' tid='93' class='m'>string1</a> <a id='96' tid='95' class='m'>string2</a> <a id='98' tid='97' class='m'>node1</a> <a id='100' tid='99' class='m'>node2</a>)
+    (<span class='i'>cond</span>
+     [(<a id='102' tid='101' class='m'>or</a> (<a id='104' tid='103' class='m'>&gt;</a> (<a id='106' tid='105' class='m'>string-length</a> <a id='108' tid='107' class='m'>string1</a>) <a id='110' tid='109' class='m'>*max-string-len*</a>)
+          (<a id='112' tid='111' class='m'>&gt;</a> (<a id='114' tid='113' class='m'>string-length</a> <a id='116' tid='115' class='m'>string2</a>) <a id='118' tid='117' class='m'>*max-string-len*</a>))
+      <span class='i'>(cond
+       [(string=? string1 string2)
+        (values (mod node1 node2 0) 0)]
+       [else
+        (total node1 node2)])</span>]
+     <span class='i'>[else
+      (let ([cost (string-dist string1 string2)])
+        (values (mod node1 node2 cost) cost))]</span>)))
+
+
+
+
+
+<span class='i'>;; global 2-D hash for storing known diffs
+</span>(<a id='764' tid='763' class='u'>define</a> <a id='766' tid='765' class='u'>*diff-hash*</a> (<a id='768' tid='767' class='u'>make-hasheq</a>))
+
+(<a id='1116' tid='1115' class='u'>define</a> <a id='1118' tid='1117' class='u'>diff-list</a>
+  <span class='i'>(lambda (ls1 ls2 move?)
+    (let ([ls1 (sort ls1 node-sort-fn)]
+          [ls2 (sort ls2 node-sort-fn)])
+      (diff-list1 (make-hasheq) ls1 ls2 move?)))</span>)
+
+
+(<span class='i'>define</span> <span class='i'>diff-list1</span>
+  (<span class='i'>lambda</span> <span class='i'>(table ls1 ls2 move?)</span>
+
+    (<a id='240' tid='239' class='m'>define</a> <a id='242' tid='241' class='m'>memo</a>
+      (<a id='244' tid='243' class='m'>lambda</a> (<a id='246' tid='245' class='m'>v1</a> <a id='248' tid='247' class='m'>v2</a>)
+        (<a id='250' tid='249' class='m'>hash-put!</a> <a id='252' tid='251' class='m'>table</a> <a id='254' tid='253' class='m'>ls1</a> <a id='256' tid='255' class='m'>ls2</a> (<a id='258' tid='257' class='m'>cons</a> <a id='260' tid='259' class='m'>v1</a> <a id='262' tid='261' class='m'>v2</a>))
+        (<a id='264' tid='263' class='m'>values</a> <a id='266' tid='265' class='m'>v1</a> <a id='268' tid='267' class='m'>v2</a>)))
+
+    (<span class='i'>define</span> <span class='i'>guess</span>
+      (<span class='i'>lambda</span> <span class='i'>(ls1  ls2)</span>
+        (<span class='i'>letv</span> <span class='i'>([(m0 c0) (diff-node (car ls1) (car ls2) move?)]
+               [(m1 c1) (diff-list1 table (cdr ls1) (cdr ls2) move?)]
+               [cost1 (+ c0 c1)])</span>
+          (<a id='120' tid='119' class='m'>cond</a>
+           [(<span class='i'>or</span> (<a id='122' tid='121' class='m'>same-def?</a> (<a id='124' tid='123' class='m'>car</a> <a id='126' tid='125' class='m'>ls1</a>) (<a id='128' tid='127' class='m'>car</a> <a id='130' tid='129' class='m'>ls2</a>))
+                <span class='i'>(zero? c0)</span>)
+            (<a id='132' tid='131' class='m'>memo</a> (<a id='134' tid='133' class='m'>append</a> <a id='136' tid='135' class='m'>m0</a> <a id='138' tid='137' class='m'>m1</a>) <a id='140' tid='139' class='m'>cost1</a>)]
+           [<a id='142' tid='141' class='m'>else</a>
+            (<span class='i'>letv</span> (<span class='i'>[(m2 c2) (diff-list1 table (cdr ls1) ls2  move?)]</span>
+                   <span class='i'>[(m3 c3) (diff-list1 table ls1 (cdr ls2) move?)]</span>
+                   [<a id='144' tid='143' class='m'>cost2</a> (<a id='146' tid='145' class='m'>+</a> <a id='148' tid='147' class='m'>c2</a> (<a id='150' tid='149' class='m'>node-size</a> (<a id='152' tid='151' class='m'>car</a> <a id='154' tid='153' class='m'>ls1</a>)))]
+                   [<a id='70' tid='69' class='m'>cost3</a> (<a id='72' tid='71' class='m'>+</a> <a id='74' tid='73' class='m'>c3</a> (<a id='76' tid='75' class='m'>node-size</a> (<a id='78' tid='77' class='m'>car</a> <a id='80' tid='79' class='m'>ls2</a>)))])
+              <span class='i'>(cond
+               [(&lt;= cost2 cost3)
+                (memo (append (del (car ls1)) m2) cost2)]
+               [else
+                (memo (append (ins (car ls2)) m3) cost3)])</span>)]))))
+
+    (<span class='i'>cond</span>
+     [(<a id='286' tid='285' class='m'>hash-get</a> <a id='288' tid='287' class='m'>table</a> <a id='290' tid='289' class='m'>ls1</a> <a id='292' tid='291' class='m'>ls2</a>)
+      <a id='294' tid='293' class='m'>=&gt;</a> (<a id='320' tid='319' class='m'>lambda</a> (<a id='322' tid='321' class='m'>cached</a>)
+           (<a id='324' tid='323' class='m'>values</a> (<a id='326' tid='325' class='m'>car</a> <a id='328' tid='327' class='m'>cached</a>) (<a id='330' tid='329' class='m'>cdr</a> <a id='332' tid='331' class='m'>cached</a>)))]
+     [(<a id='270' tid='269' class='m'>and</a> (<a id='272' tid='271' class='m'>null?</a> <a id='274' tid='273' class='m'>ls1</a>) (<a id='276' tid='275' class='m'>null?</a> <a id='278' tid='277' class='m'>ls2</a>))
+      (<a id='280' tid='279' class='m'>values</a> <a id='282' tid='281' class='m'>&#39;</a>() <a id='284' tid='283' class='m'>0</a>)]
+     <span class='i'>[(null? ls1)
+      (let ([changes (apply append (map ins ls2))])
+        (values changes (node-size ls2)))]</span>
+     <span class='i'>[(null? ls2)
+      (let ([changes (apply append (map del ls1))])
+        (values changes (node-size ls1)))]</span>
+     <span class='i'>[else
+      (guess ls1 ls2)]</span>)))
+
+
+
+
+<span class='i'>;; structure extraction
+</span>(<span class='i'>define</span> <span class='i'>diff-extract</span>
+  (<span class='i'>lambda</span> <span class='i'>(node1 node2 move?)</span>
+    (<span class='i'>cond</span>
+     <span class='i'>[(or (&lt; (node-size node1) *move-size*)
+          (&lt; (node-size node2) *move-size*))
+      (values #f #f)]</span>
+     [<span class='i'>(and (Node? node1) (Node? node2))</span>
+      (<span class='i'>cond</span>
+       [<span class='i'>(&lt;= (node-size node1) (node-size node2))</span>
+        (<span class='i'>let</span> <span class='i'>loop</span> <span class='i'>([elts2 (Node-elts node2)])</span>
+          (<a id='358' tid='357' class='m'>cond</a>
+           [(<a id='416' tid='415' class='m'>null?</a> <a id='418' tid='417' class='m'>elts2</a>) (<a id='420' tid='419' class='m'>values</a> <a id='422' tid='421' class='m'>#f</a> <a id='424' tid='423' class='m'>#f</a>)]
+           [<a id='360' tid='359' class='m'>else</a>
+            (<span class='i'>letv</span> <span class='i'>([(m0 c0) (diff-node node1 (car elts2)  move?)])</span>
+              (<a id='296' tid='295' class='m'>cond</a>
+               [<span class='i'>(or (same-def? node1 (car elts2))
+                    (zero? c0))</span>
+                (<span class='i'>let</span> <span class='i'>([frame (extract-frame node2 (car elts2) ins)])</span>
+                  (<a id='362' tid='361' class='m'>values</a> (<a id='364' tid='363' class='m'>append</a> <a id='366' tid='365' class='m'>m0</a> <a id='368' tid='367' class='m'>frame</a>) <a id='370' tid='369' class='m'>c0</a>))]
+               [<a id='298' tid='297' class='m'>else</a>
+                (<a id='300' tid='299' class='m'>loop</a> (<a id='302' tid='301' class='m'>cdr</a> <a id='304' tid='303' class='m'>elts2</a>))]))]))]
+       [<span class='i'>else</span>
+        (<span class='i'>let</span> <span class='i'>loop</span> <span class='i'>([elts1 (Node-elts node1)])</span>
+          (<a id='306' tid='305' class='m'>cond</a>
+           [(<a id='348' tid='347' class='m'>null?</a> <a id='350' tid='349' class='m'>elts1</a>) (<a id='352' tid='351' class='m'>values</a> <a id='354' tid='353' class='m'>#f</a> <a id='356' tid='355' class='m'>#f</a>)]
+           [<a id='308' tid='307' class='m'>else</a>
+            (<span class='i'>letv</span> <span class='i'>([(m0 c0) (diff-node (car elts1) node2 move?)])</span>
+              (<a id='156' tid='155' class='m'>cond</a>
+               [<span class='i'>(or (same-def? (car elts1) node2)
+                    (zero? c0))</span>
+                (<span class='i'>let</span> <span class='i'>([frame (extract-frame node1 (car elts1) del)])</span>
+                  (<a id='310' tid='309' class='m'>values</a> (<a id='312' tid='311' class='m'>append</a> <a id='314' tid='313' class='m'>m0</a> <a id='316' tid='315' class='m'>frame</a>) <a id='318' tid='317' class='m'>c0</a>))]
+               [<a id='158' tid='157' class='m'>else</a>
+                (<a id='160' tid='159' class='m'>loop</a> (<a id='162' tid='161' class='m'>cdr</a> <a id='164' tid='163' class='m'>elts1</a>))]))]))])]
+     <span class='i'>[else (values #f #f)]</span>)))
+
+
+
+
+
+<span class='i'>;-------------------------------------------------------------
+</span><span class='i'>;                    finding moves
+</span><span class='i'>;-------------------------------------------------------------
+</span>
+(<a id='1066' tid='1065' class='u'>define</a> <a id='1068' tid='1067' class='u'>big-node?</a>
+  (<a id='1070' tid='1069' class='u'>lambda</a> (<a id='1072' tid='1071' class='u'>node</a>)
+    (<a id='1074' tid='1073' class='u'>&gt;=</a> (<a id='1076' tid='1075' class='u'>node-size</a> <a id='1078' tid='1077' class='u'>node</a>) <a id='1080' tid='1079' class='u'>*move-size*</a>)))
+
+
+(<a id='1062' tid='1061' class='u'>define</a> <a id='1064' tid='1063' class='u'>big-change?</a>
+  <span class='i'>(lambda (c)
+    (cond
+     [(ins? c)
+      (big-node? (Change-new c))]
+     [(del? c)
+      (big-node? (Change-old c))]
+     [(mod? c)
+      (or (big-node? (Change-old c))
+          (big-node? (Change-new c)))]))</span>)
+
+
+(<a id='1548' tid='1547' class='u'>define</a> <a id='1550' tid='1549' class='u'>node-sort-fn</a>
+  <span class='i'>(lambda (x y)
+    (let ([name1 (get-name x)]
+          [name2 (get-name y)])
+      (cond
+       [(and name1 name2)
+        (string&lt;? (symbol-&gt;string name1)
+                  (symbol-&gt;string name2))]
+       [(and name1 (not name2)) #t]
+       [(and (not name1) name2) #f]
+       [else
+        (&lt; (Node-start x) (Node-start y))])))</span>)
+
+
+
+<span class='i'>;; iterate diff-list on the list of changes
+</span>(<a id='1104' tid='1103' class='u'>define</a> <a id='1106' tid='1105' class='u'>closure</a>
+  (<a id='676' tid='675' class='m'>lambda</a> (<a id='678' tid='677' class='m'>changes</a>)
+    (<a id='680' tid='679' class='m'>set!</a> <a id='682' tid='681' class='m'>*diff-hash*</a> (<a id='684' tid='683' class='m'>make-hasheq</a>))
+    (<span class='i'>let</span> <span class='i'>loop</span> <span class='i'>([changes changes] [closed &#39;()] [count 1])</span>
+      <span class='i'>(printf &quot;~n[move pass #~a] &quot; count)</span>
+      (<a id='686' tid='685' class='m'>letv</a> (<span class='i'>[dels (filter (predand del? big-change?) changes)]</span>
+             <span class='i'>[adds (filter (predand ins? big-change?) changes)]</span>
+             <span class='i'>[rest (set- changes (append dels adds))]</span>
+             <span class='i'>[ls1 (sort (map Change-old dels) node-sort-fn)]</span>
+             <span class='i'>[ls2 (sort (map Change-new adds) node-sort-fn)]</span>
+             <span class='i'>[(m c) (diff-list ls1 ls2 #t)]</span>
+             [<a id='688' tid='687' class='m'>new-moves</a> (<a id='690' tid='689' class='m'>map</a> <a id='692' tid='691' class='m'>mod-&gt;mov</a> (<a id='694' tid='693' class='m'>filter</a> <a id='696' tid='695' class='m'>mod?</a> <a id='698' tid='697' class='m'>m</a>))])
+        (<a id='700' tid='699' class='m'>printf</a> <a id='702' tid='701' class='m'>&quot;~n~a new moves found&quot;</a> (<a id='704' tid='703' class='m'>length</a> <a id='706' tid='705' class='m'>new-moves</a>))
+        (<span class='i'>cond</span>
+         <span class='i'>[(null? new-moves)
+          (let ([all-changes (append m rest closed)])
+            (apply append (map deframe-change all-changes)))]</span>
+         [<a id='708' tid='707' class='m'>else</a>
+          (<span class='i'>let</span> ([<a id='710' tid='709' class='m'>new-changes</a> (<a id='712' tid='711' class='m'>filter</a> (<a id='714' tid='713' class='m'>negate</a> <a id='716' tid='715' class='m'>mod?</a>) <a id='718' tid='717' class='m'>m</a>)])
+            <span class='i'>(loop new-changes
+                  (append new-moves rest closed)
+                  (add1 count))</span>)])))))
+
+
+
+
+
+<span class='i'>;-------------------------------------------------------------
+</span><span class='i'>;                      HTML generation
+</span><span class='i'>;-------------------------------------------------------------
+</span>
+<span class='i'>;----------------- utils ----------------
+</span>(<a id='1552' tid='1551' class='u'>define</a> <a id='1554' tid='1553' class='u'>qs</a>
+  <span class='i'>(lambda (x)
+    (let ([x (cond
+              [(symbol? x) (symbol-&gt;string x)]
+              [(number? x) (number-&gt;string x)]
+              [(string? x) x])])
+      (string-append &quot;&#39;&quot; x &quot;&#39;&quot;)))</span>)
+
+
+(<a id='1404' tid='1403' class='u'>define</a> <a id='1406' tid='1405' class='u'>line</a>
+  (<a id='1408' tid='1407' class='u'>lambda</a> (<a id='1410' tid='1409' class='u'>port</a> <a id='1412' tid='1411' class='u'>.</a> <a id='1414' tid='1413' class='u'>s</a>)
+    (<a id='1416' tid='1415' class='u'>display</a> (<a id='1418' tid='1417' class='u'>string-append</a> (<a id='1420' tid='1419' class='u'>apply</a> <a id='1422' tid='1421' class='u'>string-append</a> <a id='1424' tid='1423' class='u'>s</a>) <a id='1426' tid='1425' class='u'>&quot;\n&quot;</a>) <a id='1428' tid='1427' class='u'>port</a>)))
+
+
+
+(<a id='1082' tid='1081' class='u'>define</a> <a id='1084' tid='1083' class='u'>change-tags</a>
+  (<a id='720' tid='719' class='m'>lambda</a> (<a id='722' tid='721' class='m'>changes</a> <a id='724' tid='723' class='m'>side</a>)
+    (<a id='726' tid='725' class='m'>let</a> <a id='728' tid='727' class='m'>loop</a> ([<a id='730' tid='729' class='m'>cs</a> <a id='732' tid='731' class='m'>changes</a>] [<a id='734' tid='733' class='m'>tags</a> <a id='736' tid='735' class='m'>&#39;</a>()])
+      (<a id='738' tid='737' class='m'>cond</a>
+       [(<a id='740' tid='739' class='m'>null?</a> <a id='742' tid='741' class='m'>cs</a>) <a id='744' tid='743' class='m'>tags</a>]
+       [<a id='746' tid='745' class='m'>else</a>
+        (<span class='i'>let</span> <span class='i'>([key (if (eq? side &#39;left)
+                       (Change-old (car cs))
+                       (Change-new (car cs)))])</span>
+          (<span class='i'>cond</span>
+           <span class='i'>[(or (not key)
+                (= (Node-start key) (Node-end key)))
+            (loop (cdr cs) tags)]</span>
+           [<span class='i'>(and (Change-old (car cs)) (Change-new (car cs)))</span>
+            (<span class='i'>let</span> <span class='i'>([startTag (Tag (link-start (car cs) side)
+                                 (Node-start key) -1)]
+                  [endTag (Tag &quot;&lt;/a&gt;&quot; (Node-end key) (Node-start key))])</span>
+              (<a id='748' tid='747' class='m'>loop</a> (<a id='750' tid='749' class='m'>cdr</a> <a id='752' tid='751' class='m'>cs</a>) (<a id='754' tid='753' class='m'>cons</a> <a id='756' tid='755' class='m'>endTag</a> (<a id='758' tid='757' class='m'>cons</a> <a id='760' tid='759' class='m'>startTag</a> <a id='762' tid='761' class='m'>tags</a>))))]
+           [<a id='372' tid='371' class='m'>else</a>
+            (<span class='i'>let</span> <span class='i'>([startTag (Tag (span-start (car cs) side)
+                                 (Node-start key) -1)]
+                  [endTag (Tag &quot;&lt;/span&gt;&quot; (Node-end key) (Node-start key))])</span>
+              (<a id='374' tid='373' class='m'>loop</a> (<a id='376' tid='375' class='m'>cdr</a> <a id='378' tid='377' class='m'>cs</a>) (<a id='380' tid='379' class='m'>cons</a> <a id='382' tid='381' class='m'>endTag</a> (<a id='384' tid='383' class='m'>cons</a> <a id='386' tid='385' class='m'>startTag</a> <a id='388' tid='387' class='m'>tags</a>))))]))]))))
+
+
+(<a id='822' tid='821' class='u'>define</a> <a id='824' tid='823' class='u'>apply-tags</a>
+  (<a id='826' tid='825' class='u'>lambda</a> (<a id='828' tid='827' class='u'>s</a> <a id='830' tid='829' class='u'>tags</a>)
+    (<a id='832' tid='831' class='u'>let</a> ([<a id='834' tid='833' class='u'>tags</a> (<a id='836' tid='835' class='u'>sort</a> <a id='838' tid='837' class='u'>tags</a> <a id='840' tid='839' class='u'>tag-sort-fn</a>)])
+      (<a id='842' tid='841' class='u'>let</a> <a id='844' tid='843' class='u'>loop</a> ([<a id='846' tid='845' class='u'>tags</a> <a id='848' tid='847' class='u'>tags</a>] [<a id='850' tid='849' class='u'>curr</a> <a id='852' tid='851' class='u'>0</a>] [<a id='854' tid='853' class='u'>out</a> <a id='856' tid='855' class='u'>&#39;</a>()])
+        (<a id='858' tid='857' class='u'>cond</a>
+         [(<a id='860' tid='859' class='u'>null?</a> <a id='862' tid='861' class='u'>tags</a>)
+          (<a id='864' tid='863' class='u'>cond</a>
+           [(<a id='866' tid='865' class='u'>&lt;</a> <a id='868' tid='867' class='u'>curr</a> (<a id='870' tid='869' class='u'>string-length</a> <a id='872' tid='871' class='u'>s</a>))
+            (<a id='874' tid='873' class='u'>loop</a> <a id='876' tid='875' class='u'>tags</a> (<a id='878' tid='877' class='u'>add1</a> <a id='880' tid='879' class='u'>curr</a>) (<a id='882' tid='881' class='u'>cons</a> (<a id='884' tid='883' class='u'>escape</a> (<a id='886' tid='885' class='u'>string-ref</a> <a id='888' tid='887' class='u'>s</a> <a id='890' tid='889' class='u'>curr</a>)) <a id='892' tid='891' class='u'>out</a>))]
+           [<a id='894' tid='893' class='u'>else</a>
+            (<a id='896' tid='895' class='u'>apply</a> <a id='898' tid='897' class='u'>string-append</a> (<a id='900' tid='899' class='u'>reverse</a> <a id='902' tid='901' class='u'>out</a>))])]
+         [<a id='904' tid='903' class='u'>else</a>
+          (<a id='906' tid='905' class='u'>cond</a>
+           [(<a id='908' tid='907' class='u'>&lt;</a> <a id='910' tid='909' class='u'>curr</a> (<a id='912' tid='911' class='u'>Tag-idx</a> (<a id='914' tid='913' class='u'>car</a> <a id='916' tid='915' class='u'>tags</a>)))
+            (<a id='918' tid='917' class='u'>loop</a> <a id='920' tid='919' class='u'>tags</a> (<a id='922' tid='921' class='u'>add1</a> <a id='924' tid='923' class='u'>curr</a>) (<a id='926' tid='925' class='u'>cons</a> (<a id='928' tid='927' class='u'>escape</a> (<a id='930' tid='929' class='u'>string-ref</a> <a id='932' tid='931' class='u'>s</a> <a id='934' tid='933' class='u'>curr</a>)) <a id='936' tid='935' class='u'>out</a>))]
+           [<a id='938' tid='937' class='u'>else</a>
+            (<a id='940' tid='939' class='u'>loop</a> (<a id='942' tid='941' class='u'>cdr</a> <a id='944' tid='943' class='u'>tags</a>) <a id='946' tid='945' class='u'>curr</a> (<a id='948' tid='947' class='u'>cons</a> (<a id='950' tid='949' class='u'>Tag-tag</a> (<a id='952' tid='951' class='u'>car</a> <a id='954' tid='953' class='u'>tags</a>)) <a id='956' tid='955' class='u'>out</a>))])])))))
+
+
+
+<span class='i'>;; get the CSS class for the change
+</span>(<span class='i'>define</span> <span class='i'>change-class</span>
+  (<span class='i'>lambda</span> <span class='i'>(change)</span>
+    (<span class='i'>cond</span>
+     [(<a id='24' tid='23' class='m'>and</a> (<a id='26' tid='25' class='m'>eq?</a> (<a id='28' tid='27' class='m'>Change-type</a> <a id='30' tid='29' class='m'>change</a>) <a id='32' tid='31' class='m'>&#39;</a><a id='34' tid='33' class='m'>mov</a>)
+           (<a id='36' tid='35' class='m'>&gt;</a> (<a id='38' tid='37' class='m'>Change-cost</a> <a id='40' tid='39' class='m'>change</a>) <a id='42' tid='41' class='m'>0</a>))
+      <span class='i'>&quot;mc&quot;</span>]                                     <span class='i'>; move-change
+</span>     [(<a id='14' tid='13' class='m'>eq?</a> (<a id='16' tid='15' class='m'>Change-type</a> <a id='18' tid='17' class='m'>change</a>) <a id='20' tid='19' class='m'>&#39;</a><a id='22' tid='21' class='m'>mov</a>) <span class='i'>&quot;m&quot;</span>]      <span class='i'>; move
+</span>     <span class='i'>[(&gt; (Change-cost change) 0) &quot;c&quot;]</span>           <span class='i'>; change
+</span>     <span class='i'>[else &quot;u&quot;]</span>)))                              <span class='i'>; unchanged
+</span>
+
+
+(<a id='1430' tid='1429' class='u'>define</a> <a id='1432' tid='1431' class='u'>link-start</a>
+  <span class='i'>(lambda (change side)
+    (let ([cls (change-class change)]
+          [me (if (eq? side &#39;left)
+                  (Change-old change)
+                  (Change-new change))]
+          [other (if (eq? side &#39;left)
+                     (Change-new change)
+                     (Change-old change))])
+      (string-append
+       &quot;&lt;a id=&quot;  (qs (uid me))
+       &quot; tid=&quot;   (qs (uid other))
+       &quot; class=&quot; (qs cls)
+       &quot;&gt;&quot;)))</span>)
+
+
+
+(<a id='1564' tid='1563' class='u'>define</a> <a id='1566' tid='1565' class='u'>span-start</a>
+  <span class='i'>(lambda (change side)
+    (let ([cls (if (eq? &#39;del (Change-type change)) &quot;d&quot; &quot;i&quot;)]) ; del or ins
+      (string-append &quot;&lt;span class=&quot; (qs cls) &quot;&gt;&quot;)))</span>)
+
+
+
+(<a id='1704' tid='1703' class='u'>define</a> <a id='1706' tid='1705' class='u'>tag-sort-fn</a>
+  (<a id='1708' tid='1707' class='u'>lambda</a> (<a id='1710' tid='1709' class='u'>t1</a> <a id='1712' tid='1711' class='u'>t2</a>)
+    (<a id='1714' tid='1713' class='u'>cond</a>
+     [(<a id='1716' tid='1715' class='u'>=</a> (<a id='1718' tid='1717' class='u'>Tag-idx</a> <a id='1720' tid='1719' class='u'>t1</a>) (<a id='1722' tid='1721' class='u'>Tag-idx</a> <a id='1724' tid='1723' class='u'>t2</a>))
+      (<a id='1726' tid='1725' class='u'>&gt;</a> (<a id='1728' tid='1727' class='u'>Tag-start</a> <a id='1730' tid='1729' class='u'>t1</a>) (<a id='1732' tid='1731' class='u'>Tag-start</a> <a id='1734' tid='1733' class='u'>t2</a>))]
+     [<a id='1736' tid='1735' class='u'>else</a>
+      (<a id='1738' tid='1737' class='u'>&lt;</a> (<a id='1740' tid='1739' class='u'>Tag-idx</a> <a id='1742' tid='1741' class='u'>t1</a>) (<a id='1744' tid='1743' class='u'>Tag-idx</a> <a id='1746' tid='1745' class='u'>t2</a>))])))
+
+
+(<a id='770' tid='769' class='u'>define</a> <a id='772' tid='771' class='u'>*escape-table*</a>
+  <a id='774' tid='773' class='u'>&#39;</a>((<a id='776' tid='775' class='u'>#\&quot;</a>  <a id='778' tid='777' class='u'>.</a>   <a id='780' tid='779' class='u'>&quot;&quot;&quot;</a>)
+    (<a id='782' tid='781' class='u'>#\&#39;</a>  <a id='784' tid='783' class='u'>.</a>    <a id='786' tid='785' class='u'>&quot;&#39;&quot;</a>)
+    (<a id='788' tid='787' class='u'>#\&lt;</a>  <a id='790' tid='789' class='u'>.</a>    <a id='792' tid='791' class='u'>&quot;&lt;&quot;</a>)
+    (<a id='794' tid='793' class='u'>#\&gt;</a>  <a id='796' tid='795' class='u'>.</a>    <a id='798' tid='797' class='u'>&quot;&gt;&quot;</a>)))
+
+
+(<a id='1346' tid='1345' class='u'>define</a> <a id='1348' tid='1347' class='u'>escape</a>
+  (<a id='1350' tid='1349' class='u'>lambda</a> (<a id='1352' tid='1351' class='u'>c</a>)
+    (<a id='1354' tid='1353' class='u'>cond</a>
+     [(<a id='1356' tid='1355' class='u'>assq</a> <a id='1358' tid='1357' class='u'>c</a> <a id='1360' tid='1359' class='u'>*escape-table*</a>) <a id='1362' tid='1361' class='u'>=&gt;</a> <a id='1364' tid='1363' class='u'>cdr</a>]
+     [<a id='1366' tid='1365' class='u'>else</a> (<a id='1368' tid='1367' class='u'>char-&gt;string</a> <a id='1370' tid='1369' class='u'>c</a>)])))
+
+
+
+<span class='i'>; getting the base name of a path/file name
+</span><span class='i'>; (base-name &quot;mk/mk-c.scm&quot;) =&gt; mk-c
+</span>(<a id='958' tid='957' class='u'>define</a> <a id='960' tid='959' class='u'>base-name</a>
+  (<a id='962' tid='961' class='u'>lambda</a> (<a id='964' tid='963' class='u'>fn</a>)
+    (<a id='966' tid='965' class='u'>let</a> <a id='968' tid='967' class='u'>loop</a> ([<a id='970' tid='969' class='u'>i</a> (<a id='972' tid='971' class='u'>-</a> (<a id='974' tid='973' class='u'>string-length</a> <a id='976' tid='975' class='u'>fn</a>) <a id='978' tid='977' class='u'>1</a>)]
+               [<a id='980' tid='979' class='u'>start</a> <a id='982' tid='981' class='u'>-1</a>]
+               [<a id='984' tid='983' class='u'>end</a> (<a id='986' tid='985' class='u'>-</a> (<a id='988' tid='987' class='u'>string-length</a> <a id='990' tid='989' class='u'>fn</a>) <a id='992' tid='991' class='u'>1</a>)])
+      (<a id='994' tid='993' class='u'>cond</a>
+       [(<a id='996' tid='995' class='u'>=</a> <a id='998' tid='997' class='u'>i</a> <a id='1000' tid='999' class='u'>0</a>)
+        (<a id='1002' tid='1001' class='u'>substring</a> <a id='1004' tid='1003' class='u'>fn</a> <a id='1006' tid='1005' class='u'>i</a> <a id='1008' tid='1007' class='u'>end</a>)]
+       [(<a id='1010' tid='1009' class='u'>eq?</a> (<a id='1012' tid='1011' class='u'>string-ref</a> <a id='1014' tid='1013' class='u'>fn</a> <a id='1016' tid='1015' class='u'>i</a>) <a id='1018' tid='1017' class='u'>#\.</a>)
+        (<a id='1020' tid='1019' class='u'>loop</a> (<a id='1022' tid='1021' class='u'>sub1</a> <a id='1024' tid='1023' class='u'>i</a>) <a id='1026' tid='1025' class='u'>start</a> <a id='1028' tid='1027' class='u'>i</a>)]
+       [(<a id='1030' tid='1029' class='u'>eq?</a> (<a id='1032' tid='1031' class='u'>string-ref</a> <a id='1034' tid='1033' class='u'>fn</a> <a id='1036' tid='1035' class='u'>i</a>) <a id='1038' tid='1037' class='u'>#\/</a>)
+        (<a id='1040' tid='1039' class='u'>substring</a> <a id='1042' tid='1041' class='u'>fn</a> (<a id='1044' tid='1043' class='u'>add1</a> <a id='1046' tid='1045' class='u'>i</a>) <a id='1048' tid='1047' class='u'>end</a>)]
+       [<a id='1050' tid='1049' class='u'>else</a>
+        (<a id='1052' tid='1051' class='u'>loop</a> (<a id='1054' tid='1053' class='u'>sub1</a> <a id='1056' tid='1055' class='u'>i</a>) <a id='1058' tid='1057' class='u'>start</a> <a id='1060' tid='1059' class='u'>end</a>)]))))
+
+
+
+(<a id='1396' tid='1395' class='u'>define</a> <a id='1398' tid='1397' class='u'>html-header</a>
+  <span class='i'>(lambda (port)
+      (line port &quot;&lt;html&gt;&quot;)
+      (line port &quot;&lt;head&gt;&quot;)
+      (line port &quot;&lt;META http-equiv=\&quot;Content-Type\&quot;&quot;
+                      &quot; content=\&quot;text/html; charset=utf-8\&quot;&gt;&quot;)
+      (line port &quot;&lt;LINK href=\&quot;diff.css\&quot;&quot;
+                      &quot; rel=\&quot;stylesheet\&quot; type=\&quot;text/css\&quot;&gt;&quot;)
+      (line port &quot;&lt;script type=\&quot;text/javascript\&quot;&quot;
+                        &quot; src=\&quot;nav.js\&quot;&gt;&lt;/script&gt;&quot;)
+      (line port &quot;&lt;/head&gt;&quot;)
+      (line port &quot;&lt;body&gt;&quot;))</span>)
+
+
+
+(<a id='1376' tid='1375' class='u'>define</a> <a id='1378' tid='1377' class='u'>html-footer</a>
+  (<a id='1380' tid='1379' class='u'>lambda</a> (<a id='1382' tid='1381' class='u'>port</a>)
+    (<a id='1384' tid='1383' class='u'>line</a> <a id='1386' tid='1385' class='u'>port</a> <a id='1388' tid='1387' class='u'>&quot;&lt;/body&gt;&quot;</a>)
+    (<a id='1390' tid='1389' class='u'>line</a> <a id='1392' tid='1391' class='u'>port</a> <a id='1394' tid='1393' class='u'>&quot;&lt;/html&gt;&quot;</a>)))
+
+
+
+(<a id='1834' tid='1833' class='u'>define</a> <a id='1836' tid='1835' class='u'>write-html</a>
+  (<a id='1838' tid='1837' class='u'>lambda</a> (<a id='1840' tid='1839' class='u'>port</a> <a id='1842' tid='1841' class='u'>text</a> <a id='1844' tid='1843' class='u'>side</a>)
+    (<a id='1846' tid='1845' class='u'>line</a> <a id='1848' tid='1847' class='u'>port</a> (<a id='1850' tid='1849' class='u'>string-append</a> <a id='1852' tid='1851' class='u'>&quot;&lt;div id=\&quot;&quot;</a> <a id='1854' tid='1853' class='u'>side</a> <a id='1856' tid='1855' class='u'>&quot;\&quot; class=\&quot;src\&quot;&gt;&quot;</a>))
+    (<a id='1858' tid='1857' class='u'>line</a> <a id='1860' tid='1859' class='u'>port</a> <a id='1862' tid='1861' class='u'>&quot;&lt;pre&gt;&quot;</a>)
+    (<a id='1864' tid='1863' class='u'>if</a> (<a id='1866' tid='1865' class='u'>string=?</a> <a id='1868' tid='1867' class='u'>side</a> <a id='1870' tid='1869' class='u'>&quot;left&quot;</a>)
+        (<a id='1872' tid='1871' class='u'>line</a> <a id='1874' tid='1873' class='u'>port</a> <a id='1876' tid='1875' class='u'>&quot;&lt;a id=&#39;leftstart&#39; tid=&#39;rightstart&#39;&gt;&lt;/a&gt;&quot;</a>)
+        (<a id='1878' tid='1877' class='u'>line</a> <a id='1880' tid='1879' class='u'>port</a> <a id='1882' tid='1881' class='u'>&quot;&lt;a id=&#39;rightstart&#39; tid=&#39;leftstart&#39;&gt;&lt;/a&gt;&quot;</a>))
+    (<a id='1884' tid='1883' class='u'>line</a> <a id='1886' tid='1885' class='u'>port</a> <a id='1888' tid='1887' class='u'>text</a>)
+    (<a id='1890' tid='1889' class='u'>line</a> <a id='1892' tid='1891' class='u'>port</a> <a id='1894' tid='1893' class='u'>&quot;&lt;/pre&gt;&quot;</a>)
+    (<a id='1896' tid='1895' class='u'>line</a> <a id='1898' tid='1897' class='u'>port</a> <a id='1900' tid='1899' class='u'>&quot;&lt;/div&gt;&quot;</a>)))
+
+
+
+<span class='i'>;; poor man&#39;s progress bar
+</span>(<a id='1124' tid='1123' class='u'>define</a> <a id='1126' tid='1125' class='u'>diff-progress</a>
+  (<a id='1128' tid='1127' class='u'>new-progress</a> <a id='1130' tid='1129' class='u'>10000</a>))
+
+
+
+(<a id='1086' tid='1085' class='u'>define</a> <a id='1088' tid='1087' class='u'>cleanup</a>
+  (<a id='1090' tid='1089' class='u'>lambda</a> ()
+    (<a id='1092' tid='1091' class='u'>set!</a> <a id='1094' tid='1093' class='u'>*node-size-hash*</a> (<a id='1096' tid='1095' class='u'>make-hasheq</a>))
+    (<a id='1098' tid='1097' class='u'>set!</a> <a id='1100' tid='1099' class='u'>*diff-hash*</a> (<a id='1102' tid='1101' class='u'>make-hasheq</a>))))
+
+
+
+<span class='i'>;; main diff function
+</span><span class='i'>;; returns all changes after diffing and moving
+</span>(<a id='1112' tid='1111' class='u'>define</a> <a id='1114' tid='1113' class='u'>diff</a>
+  <span class='i'>(lambda (node1 node2)
+    (letv ([start (current-seconds)]
+           [(changes _) (diff-node node1 node2 #f)]
+           [_ (diff-progress &quot;\nDone diffing&quot;)]
+;           [changes (closure changes)]
+           [_ (diff-progress &quot;\nDone moving&quot;)]
+           [end (current-seconds)])
+      (printf &quot;finished in ~a seconds~n&quot; (- end start))
+      (cleanup)
+      changes))</span>)
+
+
+
+(<span class='i'>define</span> <span class='i'>htmlize</span>
+  (<span class='i'>lambda</span> <span class='i'>(changes file1 file2 text1 text2)</span>
+    (<span class='i'>letv</span> (<span class='i'>[tags1 (change-tags changes &#39;left)]</span>
+           <span class='i'>[tags2 (change-tags changes &#39;right)]</span>
+           <span class='i'>[tagged-text1 (apply-tags text1 tags1)]</span>
+           <span class='i'>[tagged-text2 (apply-tags text2 tags2)]</span>
+           [<span class='i'>out-file</span> (<a id='44' tid='43' class='m'>string-append</a> (<a id='46' tid='45' class='m'>base-name</a> <a id='48' tid='47' class='m'>file1</a>) <a id='50' tid='49' class='m'>&quot;-&quot;</a>
+                                    (<a id='52' tid='51' class='m'>base-name</a> <a id='54' tid='53' class='m'>file2</a>) <a id='56' tid='55' class='m'>&quot;.html&quot;</a>)]
+           <span class='i'>[port (open-output-file out-file
+                                   #:mode &#39;text
+                                   #:exists &#39;replace)]</span>)
+      <span class='i'>(html-header port)</span>
+      <span class='i'>(write-html port tagged-text1 &quot;left&quot;)</span>
+      <span class='i'>(write-html port tagged-text2 &quot;right&quot;)</span>
+      <span class='i'>(html-footer port)</span>
+      <span class='i'>(close-output-port port)</span>)))
+
+
+</pre>
+</div>
+</body>
+</html>
