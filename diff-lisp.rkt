@@ -1,7 +1,7 @@
 #lang racket
 
 (require "structs.rkt")
-(require "parse-scheme.rkt")
+(require "parse-lisp.rkt")
 (require "diff.rkt")
 (require "utils.rkt")
 
@@ -10,10 +10,11 @@
   '(define defun defvar lambda cond if else
      let let* let-values let*-values
      while for define-syntax syntax-rules
-     define-minor-mode))
+     define-minor-mode defmacro defn))
 
 (define *defs*
-  '(define defun defvar define-syntax define-minor-mode))
+  '(define defun defvar define-syntax define-minor-mode
+    defmacro defn))
 
 
 (define get-keyword
@@ -57,20 +58,20 @@
 
 
 ;; function interface
-(define diff-scheme
+(define diff-lisp
   (lambda (file1 file2)
     (let* ([text1 (read-file file1)]
            [text2 (read-file file2)]
-           [node1 (parse-scheme text1)]
-           [node2 (parse-scheme text2)]
+           [node1 (parse-lisp text1)]
+           [node2 (parse-lisp text2)]
            [changes (diff node1 node2)])
       (htmlize changes file1 file2 text1 text2))))
 
-;; (diff-scheme "demos/mk1.ss" "demos/mk2.ss")
+;; (diff-lisp "demos/mk1.ss" "demos/mk2.ss")
 
 
 ;; command line interface
 (let* ([args (current-command-line-arguments)]
        [file1 (vector-ref args 0)]
        [file2 (vector-ref args 1)])
-  (diff-scheme file1 file2))
+  (diff-lisp file1 file2))

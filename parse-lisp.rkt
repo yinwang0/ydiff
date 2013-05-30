@@ -20,7 +20,7 @@
 (require "parsec.rkt")
 (require "utils.rkt")
 
-(provide parse-scheme)
+(provide parse-lisp)
 
 
 ;-------------------------------------------------------------
@@ -64,7 +64,7 @@
 (:: $program $sexp)
 
 
-(define parse-scheme
+(define parse-lisp
   (lambda (s)
     (set-parameters)
     (first-val ($eval $sexp (scan s)))))
@@ -77,4 +77,4 @@
 ;;    [(null? args) '()]
 ;;    [else
 ;;     (set-parameters)
-;;     (print (parse-scheme (read-file (vector-ref args 0))))]))
+;;     (print (parse-lisp (read-file (vector-ref args 0))))]))

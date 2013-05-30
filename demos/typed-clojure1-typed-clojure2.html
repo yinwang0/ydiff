@@ -1,0 +1,1773 @@
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=utf-8">
+<LINK href="diff.css" rel="stylesheet" type="text/css">
+<script type="text/javascript" src="nav.js"></script>
+</head>
+<body>
+<div id="left" class="src">
+<pre>
+<a id='leftstart' tid='rightstart'></a>
+<span class='d'>(ns clojure.core.typed
+  (:refer-clojure :exclude [defrecord type])
+  (:import (clojure.lang IPersistentList IPersistentVector Symbol Cons Seqable IPersistentCollection
+                         ISeq ASeq ILookup Var Namespace PersistentVector APersistentVector
+                         IFn IPersistentStack Associative IPersistentSet IPersistentMap IMapEntry
+                         Keyword Atom PersistentList IMeta PersistentArrayMap Compiler Named
+                         IRef AReference ARef IDeref IReference APersistentSet PersistentHashSet Sorted
+                         LazySeq APersistentMap))
+  (:require [analyze.core :refer [ast] :as analyze]
+            [analyze.hygienic :as hygienic]
+            [clojure.set :as set]
+            [clojure.reflect :as reflect]
+            [clojure.string :as str]
+            [clojure.repl :refer [pst]]
+            [clojure.pprint :refer [pprint]]
+            [trammel.core :as contracts]
+            [clojure.math.combinatorics :as comb]
+            [clojure.java.io :as io]
+            [cljs
+             [compiler]
+             [analyzer :as cljs]]
+            [clojure.tools.trace :refer [trace-vars untrace-vars
+                                         trace-ns untrace-ns]]))</span>
+
+<span class='d'>(set! *warn-on-reflection* true)</span>
+
+
+<span class='d'>; constraint shorthands, other handy functions
+</span><span class='d'>(load &quot;typed/utils&quot;)</span>
+
+<span class='d'>;Note: defrecord is now trammel&#39;s defconstrainedrecord
+</span>
+<span class='d'>;(ann analyze.hygienic/emit-hy [Any -&gt; Any])
+</span>
+<span class='d'>;AnalysisExpr -&gt; Form
+</span><span class='d'>;(ann emit-form-fn [Any -&gt; Any])
+</span><span class='d'>(def emit-form-fn hygienic/emit-hy)</span>
+
+<span class='d'>;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+</span><span class='d'>;; Special functions
+</span>
+<span class='d'>;(ann print-filterset [String Any -&gt; Any])
+</span>(<a id='781' tid='782' class='u'>defn</a> <a id='783' tid='784' class='u'>print-filterset</a>
+  <span class='d'>&quot;Print the filter set attached to form, and debug-string&quot;</span>
+  [<a id='785' tid='786' class='u'>debug-string</a> <a id='787' tid='788' class='u'>frm</a>] 
+  <a id='789' tid='790' class='u'>frm</a>)
+
+<span class='d'>(declare Method-&gt;Function unparse-type unparse-filter)</span>
+
+<span class='d'>;(ann method-type [Symbol -&gt; nil])
+</span>(<a id='671' tid='672' class='u'>defn</a> <a id='673' tid='674' class='u'>method-type</a> 
+  <span class='d'>&quot;Given a method symbol, print the core.typed types assigned to it&quot;</span>
+  [<a id='675' tid='676' class='u'>mname</a>]
+  (<span class='d'>let</span> [<span class='d'>ms</span> (<span class='d'>-&gt;&gt;</span> <span class='d'>(reflect/type-reflect (Class/forName (namespace mname)))</span>
+             <span class='d'>:members</span>
+             (<a id='171' tid='172' class='m'>filter</a> <a id='173' tid='174' class='m'>#</a>(<a id='175' tid='176' class='m'>and</a> (<a id='177' tid='178' class='m'>instance?</a> <a id='179' tid='180' class='m'>clojure.reflect.Method</a> <a id='181' tid='182' class='m'>%</a>)
+                           (<a id='183' tid='184' class='m'>=</a> (<a id='185' tid='186' class='m'>str</a> (<a id='187' tid='188' class='m'>:name</a> <a id='189' tid='190' class='m'>%</a>)) (<a id='191' tid='192' class='m'>name</a> <a id='193' tid='194' class='m'>mname</a>))))
+             <span class='d'>set</span>)
+        <span class='d'>_</span> (<a id='147' tid='148' class='m'>assert</a> (<a id='149' tid='150' class='m'>seq</a> <a id='151' tid='152' class='m'>ms</a>) (<a id='153' tid='154' class='m'>str</a> <a id='155' tid='156' class='m'>&quot;Method &quot;</a> <a id='157' tid='158' class='m'>mname</a> <a id='159' tid='160' class='m'>&quot; not found&quot;</a>))]
+    <span class='d'>(prn &quot;Method name:&quot; mname)</span>
+    <span class='d'>(doseq [m ms]
+      (prn (unparse-type (Method-&gt;Function m))))</span>))
+
+<span class='d'>;(ann inst-poly [Any Any -&gt; Any])
+</span>(<a id='589' tid='590' class='u'>defn</a> <a id='591' tid='592' class='u'>inst-poly</a> 
+  [<a id='593' tid='594' class='u'>inst-of</a> <a id='595' tid='596' class='u'>types-syn</a>]
+  <a id='597' tid='598' class='u'>inst-of</a>)
+
+<span class='d'>;(ann inst-poly-ctor [Any Any -&gt; Any])
+</span>(<a id='599' tid='600' class='u'>defn</a> <a id='601' tid='602' class='u'>inst-poly-ctor</a> [<a id='603' tid='604' class='u'>inst-of</a> <a id='605' tid='606' class='u'>types-syn</a>]
+  <a id='607' tid='608' class='u'>inst-of</a>)
+
+(<a id='545' tid='546' class='u'>defmacro</a> <a id='547' tid='548' class='u'>inst</a> 
+  <a id='549' tid='550' class='u'>&quot;Instantiate a polymorphic type with a number of types&quot;</a>
+  [<a id='551' tid='552' class='u'>inst-of</a> <a id='553' tid='554' class='u'>&</a> <a id='555' tid='556' class='u'>types</a>]
+  <a id='557' tid='558' class='u'>`</a>(<a id='559' tid='560' class='u'>inst-poly</a> <a id='561' tid='562' class='u'>~inst-of</a> <a id='563' tid='564' class='u'>&#39;</a><a id='565' tid='566' class='u'>~types</a>))
+
+(<a id='567' tid='568' class='u'>defmacro</a> <a id='569' tid='570' class='u'>inst-ctor</a>
+  <a id='571' tid='572' class='u'>&quot;Instantiate a call to a constructor with a number of types.
+  First argument must be an immediate call to a constructor.&quot;</a>
+  [<a id='573' tid='574' class='u'>inst-of</a> <a id='575' tid='576' class='u'>&</a> <a id='577' tid='578' class='u'>types</a>]
+  <a id='579' tid='580' class='u'>`</a>(<a id='581' tid='582' class='u'>inst-poly-ctor</a> <a id='583' tid='584' class='u'>~inst-of</a> <a id='585' tid='586' class='u'>&#39;</a><a id='587' tid='588' class='u'>~types</a>))
+
+<span class='d'>;(ann fn&gt;-ann [Any Any -&gt; Any])
+</span>(<a id='535' tid='536' class='u'>defn</a> <a id='537' tid='538' class='u'>fn&gt;-ann</a> [<a id='539' tid='540' class='u'>fn-of</a> <a id='541' tid='542' class='u'>param-types-syn</a>]
+  <a id='543' tid='544' class='u'>fn-of</a>)
+
+<span class='d'>;(ann pfn&gt;-ann [Any Any -&gt; Any])
+</span>(<a id='761' tid='762' class='u'>defn</a> <a id='763' tid='764' class='u'>pfn&gt;-ann</a> [<a id='765' tid='766' class='u'>fn-of</a> <a id='767' tid='768' class='u'>polys</a> <a id='769' tid='770' class='u'>param-types-syn</a>]
+  <a id='771' tid='772' class='u'>fn-of</a>)
+
+<span class='d'>;(ann loop&gt;-ann [Any Any -&gt; Any])
+</span>(<a id='661' tid='662' class='u'>defn</a> <a id='663' tid='664' class='u'>loop&gt;-ann</a> [<a id='665' tid='666' class='u'>loop-of</a> <a id='667' tid='668' class='u'>bnding-types</a>]
+  <a id='669' tid='670' class='u'>loop-of</a>)
+
+<span class='d'>;(ann doseq&gt;-ann [Any Any -&gt; Any])
+</span><span class='d'>(defn doseq&gt;-ann [the-doseq bnding-types body]
+  the-doseq)</span>
+
+<span class='d'>;(ann parse-fn&gt; [Any (Seqable Any) -&gt;
+</span><span class='d'>;                &#39;{:poly Any
+</span><span class='d'>;                  :fn Any ;Form
+</span><span class='d'>;                  :parsed-methods (Seqable &#39;{:dom-syntax (Seqable Any)
+</span><span class='d'>;                                             :dom-lhs (Seqable Any)
+</span><span class='d'>;                                             :rng-syntax Any
+</span><span class='d'>;                                             :has-rng? Any
+</span><span class='d'>;                                             :body Any})}])
+</span><span class='d'>;for
+</span>(<a id='195' tid='196' class='m'>defn-</a> <a id='197' tid='198' class='m'>parse-fn&gt;</a>
+  <a id='199' tid='200' class='m'>&quot;(fn&gt; name? :- type? [[param :- type]* & [param :- type *]?] exprs*)
+  (fn&gt; name? (:- type? [[param :- type]* & [param :- type *]?] exprs*)+)&quot;</a>
+  [<a id='201' tid='202' class='m'>is-poly</a> <a id='203' tid='204' class='m'>forms</a>]
+  (<a id='205' tid='206' class='m'>let</a> [<span class='d'>name</span> (<a id='207' tid='208' class='m'>when</a> (<a id='209' tid='210' class='m'>symbol?</a> (<a id='211' tid='212' class='m'>first</a> <a id='213' tid='214' class='m'>forms</a>))
+               (<a id='215' tid='216' class='m'>first</a> <a id='217' tid='218' class='m'>forms</a>))
+        <span class='d'>forms</span> (<a id='161' tid='162' class='m'>if</a> <a id='163' tid='164' class='m'>name</a> (<a id='165' tid='166' class='m'>rest</a> <a id='167' tid='168' class='m'>forms</a>) <a id='169' tid='170' class='m'>forms</a>)
+        <span class='d'>poly</span> <span class='d'>(when is-poly
+               (first forms))</span>
+        <span class='d'>forms</span> (<a id='137' tid='138' class='m'>if</a> <a id='139' tid='140' class='m'>poly</a> (<a id='141' tid='142' class='m'>rest</a> <a id='143' tid='144' class='m'>forms</a>) <a id='145' tid='146' class='m'>forms</a>)
+        <span class='d'>methods</span> (<a id='119' tid='120' class='m'>if</a> ((<a id='121' tid='122' class='m'>some-fn</a> <a id='123' tid='124' class='m'>vector?</a> <a id='125' tid='126' class='m'>keyword?</a>) (<a id='127' tid='128' class='m'>first</a> <a id='129' tid='130' class='m'>forms</a>))
+                  (<a id='131' tid='132' class='m'>list</a> <a id='133' tid='134' class='m'>forms</a>)
+                  <a id='135' tid='136' class='m'>forms</a>)
+        <span class='d'>;(fn&gt; name? (:- type? [[param :- type]* & [param :- type *]?] exprs*)+)&quot;
+</span>        <span class='d'>; (HMap {:dom (Seqable TypeSyntax)
+</span>        <span class='d'>;        :rng (U nil TypeSyntax)
+</span>        <span class='d'>;        :body Any})
+</span>        <span class='d'>parsed-methods</span> (<a id='25' tid='26' class='m'>doall</a> 
+                         (<a id='27' tid='28' class='m'>for</a> [<a id='29' tid='30' class='m'>method</a> <a id='31' tid='32' class='m'>methods</a>]
+                           (<a id='33' tid='34' class='m'>let</a> [<span class='d'>[ret has-ret?]</span> (<a id='35' tid='36' class='m'>when</a> (<a id='37' tid='38' class='m'>not</a> (<a id='39' tid='40' class='m'>vector?</a> (<a id='41' tid='42' class='m'>first</a> <a id='43' tid='44' class='m'>method</a>)))
+                                                  (<a id='45' tid='46' class='m'>assert</a> (<a id='47' tid='48' class='m'>=</a> <a id='49' tid='50' class='m'>:-</a> (<a id='51' tid='52' class='m'>first</a> <a id='53' tid='54' class='m'>method</a>))
+                                                          <a id='55' tid='56' class='m'>&quot;Return type for fn&gt; must be prefixed by :-&quot;</a>)
+                                                  [(<a id='57' tid='58' class='m'>second</a> <a id='59' tid='60' class='m'>method</a>) <a id='61' tid='62' class='m'>true</a>])
+                                 <span class='d'>method</span> (<a id='15' tid='16' class='m'>if</a> <a id='17' tid='18' class='m'>ret</a> 
+                                          (<a id='19' tid='20' class='m'>nnext</a> <a id='21' tid='22' class='m'>method</a>)
+                                          <a id='23' tid='24' class='m'>method</a>)
+                                 <span class='d'>body</span> <span class='d'>(rest method)</span>
+                                 <span class='d'>arg-anns</span> <span class='d'>(first method)</span>
+                                 <span class='d'>[required-params _ [rest-param]]</span> (<a id='1' tid='2' class='m'>split-with</a> <a id='3' tid='4' class='m'>#</a>(<a id='5' tid='6' class='m'>not=</a> <a id='7' tid='8' class='m'>&#39;</a><a id='9' tid='10' class='m'>&</a> <a id='11' tid='12' class='m'>%</a>) <a id='13' tid='14' class='m'>arg-anns</a>)]
+                             (<a id='63' tid='64' class='m'>assert</a> (<a id='65' tid='66' class='m'>sequential?</a> <a id='67' tid='68' class='m'>required-params</a>)
+                                     <a id='69' tid='70' class='m'>&quot;Must provide a sequence of typed parameters to fn&gt;&quot;</a>)
+                             (<a id='71' tid='72' class='m'>assert</a> (<a id='73' tid='74' class='m'>not</a> <a id='75' tid='76' class='m'>rest-param</a>) <a id='77' tid='78' class='m'>&quot;fn&gt; doesn&#39;t support rest parameters yet&quot;</a>)
+                             <a id='79' tid='80' class='m'>{</a><a id='81' tid='82' class='m'>:dom-syntax</a> (<a id='83' tid='84' class='m'>doall</a> (<a id='85' tid='86' class='m'>map</a> (<a id='87' tid='88' class='m'>comp</a> <a id='89' tid='90' class='m'>second</a> <a id='91' tid='92' class='m'>next</a>) <a id='93' tid='94' class='m'>required-params</a>))
+                              <a id='95' tid='96' class='m'>:dom-lhs</a> (<a id='97' tid='98' class='m'>doall</a> (<a id='99' tid='100' class='m'>map</a> <a id='101' tid='102' class='m'>first</a> <a id='103' tid='104' class='m'>required-params</a>))
+                              <a id='105' tid='106' class='m'>:rng-syntax</a> <a id='107' tid='108' class='m'>ret</a>
+                              <a id='109' tid='110' class='m'>:has-rng?</a> <a id='111' tid='112' class='m'>has-ret?</a>
+                              <a id='113' tid='114' class='m'>:body</a> <a id='115' tid='116' class='m'>body</a><a id='117' tid='118' class='m'>}</a>)))]
+    <a id='219' tid='220' class='m'>{</a><a id='221' tid='222' class='m'>:poly</a> <a id='223' tid='224' class='m'>poly</a>
+     <a id='225' tid='226' class='m'>:fn</a> <a id='227' tid='228' class='m'>`</a>(<a id='229' tid='230' class='m'>fn</a> <a id='231' tid='232' class='m'>~@</a>(<a id='233' tid='234' class='m'>concat</a>
+                  (<a id='235' tid='236' class='m'>when</a> <a id='237' tid='238' class='m'>name</a>
+                    [<a id='239' tid='240' class='m'>name</a>])
+                  (<a id='241' tid='242' class='m'>for</a> [<a id='243' tid='244' class='m'>{</a><a id='245' tid='246' class='m'>:keys</a> [<a id='247' tid='248' class='m'>body</a> <a id='249' tid='250' class='m'>dom-lhs</a>]<a id='251' tid='252' class='m'>}</a> <a id='253' tid='254' class='m'>parsed-methods</a>]
+                    (<a id='255' tid='256' class='m'>apply</a> <a id='257' tid='258' class='m'>list</a> (<a id='259' tid='260' class='m'>vec</a> <a id='261' tid='262' class='m'>dom-lhs</a>) <a id='263' tid='264' class='m'>body</a>))))
+     <a id='265' tid='266' class='m'>:parsed-methods</a> <a id='267' tid='268' class='m'>parsed-methods</a><a id='269' tid='270' class='m'>}</a>))
+
+(<a id='717' tid='718' class='u'>defmacro</a> <a id='719' tid='720' class='u'>pfn&gt;</a> 
+  <a id='721' tid='722' class='u'>&quot;Define a polymorphic typed anonymous function.
+  (pfn&gt; name? [binder+] :- type? [[param :- type]* & [param :- type *]?] exprs*)
+  (pfn&gt; name? [binder+] (:- type? [[param :- type]* & [param :- type *]?] exprs*)+)&quot;</a>
+  [<a id='723' tid='724' class='u'>&</a> <a id='725' tid='726' class='u'>forms</a>]
+  (<a id='727' tid='728' class='u'>let</a> [<a id='729' tid='730' class='u'>{</a><a id='731' tid='732' class='u'>:keys</a> [<a id='733' tid='734' class='u'>poly</a> <a id='735' tid='736' class='u'>fn</a> <a id='737' tid='738' class='u'>parsed-methods</a>]<a id='739' tid='740' class='u'>}</a> (<a id='741' tid='742' class='u'>parse-fn&gt;</a> <a id='743' tid='744' class='u'>true</a> <a id='745' tid='746' class='u'>forms</a>)]
+    <a id='747' tid='748' class='u'>`</a>(<a id='749' tid='750' class='u'>pfn&gt;-ann</a> <a id='751' tid='752' class='u'>~fn</a> <a id='753' tid='754' class='u'>&#39;</a><a id='755' tid='756' class='u'>~poly</a> <a id='757' tid='758' class='u'>&#39;</a><a id='759' tid='760' class='u'>~parsed-methods</a>)))
+
+(<a id='497' tid='498' class='u'>defmacro</a> <a id='499' tid='500' class='u'>fn&gt;</a> 
+  <a id='501' tid='502' class='u'>&quot;Define a typed anonymous function.
+  (fn&gt; name? :- type? [[param :- type]* & [param :- type *]?] exprs*)
+  (fn&gt; name? (:- type? [[param :- type]* & [param :- type *]?] exprs*)+)&quot;</a>
+  [<a id='503' tid='504' class='u'>&</a> <a id='505' tid='506' class='u'>forms</a>]
+  (<a id='507' tid='508' class='u'>let</a> [<a id='509' tid='510' class='u'>{</a><a id='511' tid='512' class='u'>:keys</a> [<a id='513' tid='514' class='u'>fn</a> <a id='515' tid='516' class='u'>parsed-methods</a>]<a id='517' tid='518' class='u'>}</a> (<a id='519' tid='520' class='u'>parse-fn&gt;</a> <a id='521' tid='522' class='u'>false</a> <a id='523' tid='524' class='u'>forms</a>)]
+    <a id='525' tid='526' class='u'>`</a>(<a id='527' tid='528' class='u'>fn&gt;-ann</a> <a id='529' tid='530' class='u'>~fn</a> <a id='531' tid='532' class='u'>&#39;</a><a id='533' tid='534' class='u'>~parsed-methods</a>)))
+
+(<a id='481' tid='482' class='u'>defmacro</a> <a id='483' tid='484' class='u'>defprotocol&gt;</a> [<a id='485' tid='486' class='u'>&</a> <a id='487' tid='488' class='u'>body</a>]
+  <span class='d'>&quot;Define a typed protocol&quot;</span>
+  <a id='489' tid='490' class='u'>`</a>(<a id='491' tid='492' class='u'>tc-ignore</a>
+     (<a id='493' tid='494' class='u'>defprotocol</a> <a id='495' tid='496' class='u'>~@body</a>)))
+
+(<a id='651' tid='652' class='u'>defmacro</a> <a id='653' tid='654' class='u'>loop&gt;</a>
+  <span class='d'>&quot;Define a typed loop&quot;</span>
+  [<a id='655' tid='656' class='u'>bndings*</a> <a id='657' tid='658' class='u'>&</a> <a id='659' tid='660' class='u'>forms</a>]
+  (<a id='271' tid='272' class='m'>let</a> [<span class='d'>bnds</span> <span class='d'>(partition 2 bndings*)</span>
+        <span class='d'>; [[lhs :- bnd-ann] rhs]
+</span>        <span class='d'>lhs</span> <span class='d'>(map ffirst bnds)</span>
+        <span class='d'>rhs</span> <span class='d'>(map second bnds)</span>
+        <span class='d'>bnd-anns</span> (<a id='273' tid='274' class='m'>map</a> <a id='275' tid='276' class='m'>#</a>(<a id='277' tid='278' class='m'>-&gt;</a> <a id='279' tid='280' class='m'>%</a> <a id='281' tid='282' class='m'>first</a> <a id='283' tid='284' class='m'>next</a> <a id='285' tid='286' class='m'>second</a>) <a id='287' tid='288' class='m'>bnds</a>)]
+    <a id='289' tid='290' class='m'>`</a>(<a id='291' tid='292' class='m'>loop&gt;-ann</a> (<a id='293' tid='294' class='m'>loop</a> <a id='295' tid='296' class='m'>~</a>(<a id='297' tid='298' class='m'>vec</a> (<a id='299' tid='300' class='m'>mapcat</a> <a id='301' tid='302' class='m'>vector</a> <a id='303' tid='304' class='m'>lhs</a> <a id='305' tid='306' class='m'>rhs</a>))
+                  <a id='307' tid='308' class='m'>~@forms</a>)
+                <a id='309' tid='310' class='m'>&#39;</a><a id='311' tid='312' class='m'>~bnd-anns</a>)))
+
+(<a id='441' tid='442' class='u'>defmacro</a> <a id='443' tid='444' class='u'>declare-datatypes</a> 
+  <a id='445' tid='446' class='u'>&quot;Declare datatypes, similar to declare but on the type level.&quot;</a>
+  [<a id='447' tid='448' class='u'>&</a> <a id='449' tid='450' class='u'>syms</a>]
+  <a id='451' tid='452' class='u'>`</a><span class='d'>(tc-ignore
+  (doseq [sym# &#39;~syms]
+    (assert (not (or (some #(= \. %) (str sym#))
+                     (namespace sym#)))
+            (str &quot;Cannot declare qualified datatype: &quot; sym#))
+    (let [qsym# (symbol (str (munge (name (ns-name *ns*))) \. (name sym#)))]
+      (declare-datatype* qsym#))))</span>)
+
+(<a id='465' tid='466' class='u'>defmacro</a> <a id='467' tid='468' class='u'>declare-protocols</a> 
+  <a id='469' tid='470' class='u'>&quot;Declare protocols, similar to declare but on the type level.&quot;</a>
+  [<a id='471' tid='472' class='u'>&</a> <a id='473' tid='474' class='u'>syms</a>]
+  <a id='475' tid='476' class='u'>`</a><span class='d'>(tc-ignore
+  (doseq [sym# &#39;~syms]
+     (let [qsym# (if (namespace sym#)
+                   sym#
+                   (symbol (str (name (ns-name *ns*))) (name sym#)))]
+       (declare-protocol* qsym#))))</span>)
+
+(<a id='429' tid='430' class='u'>defmacro</a> <a id='431' tid='432' class='u'>declare-alias-kind</a>
+  <a id='433' tid='434' class='u'>&quot;Declare a kind for an alias, similar to declare but on the kind level.&quot;</a>
+  [<a id='435' tid='436' class='u'>sym</a> <a id='437' tid='438' class='u'>ty</a>]
+  <a id='439' tid='440' class='u'>`</a><span class='d'>(tc-ignore
+   (do (ensure-clojure)
+     (let [sym# &#39;~sym
+           qsym# (if (namespace sym#)
+                   sym#
+                   (symbol (name (ns-name *ns*)) (name sym#)))
+           ty# (parse-type &#39;~ty)]
+       (assert (not (namespace sym#)) (str &quot;Cannot declare qualified name &quot; sym#))
+       (declare ~sym)
+       (declare-names ~sym)
+       (declare-alias-kind* qsym# ty#))))</span>)
+
+(<a id='453' tid='454' class='u'>defmacro</a> <a id='455' tid='456' class='u'>declare-names</a> 
+  <a id='457' tid='458' class='u'>&quot;Declare names, similar to declare but on the type level.&quot;</a>
+  [<a id='459' tid='460' class='u'>&</a> <a id='461' tid='462' class='u'>syms</a>]
+  <a id='463' tid='464' class='u'>`</a><span class='d'>(tc-ignore
+  (doseq [sym# &#39;~syms]
+     (let [qsym# (if (namespace sym#)
+                   sym#
+                   (symbol (name (ns-name *ns*)) (name sym#)))]
+       (declare-name* qsym#))))</span>)
+
+(<a id='477' tid='478' class='u'>defmacro</a> <a id='479' tid='480' class='u'>def-alias</a> 
+  <span class='d'>&quot;Define a type alias&quot;</span>
+  <span class='d'>[sym type]</span>
+  <span class='d'>`</span><span class='d'>(tc-ignore
+  (do (ensure-clojure)
+    (let [sym# (if (namespace &#39;~sym)
+                 &#39;~sym
+                 (symbol (name (ns-name *ns*)) (name &#39;~sym)))
+          ty# (parse-type &#39;~type)]
+      (add-type-name sym# ty#)
+      (declare ~sym)
+      (when-let [tfn# (@DECLARED-KIND-ENV sym#)]
+        (assert (subtype? ty# tfn#) (error-msg &quot;Declared kind &quot; (unparse-type tfn#)
+                                               &quot; does not match actual kind &quot; (unparse-type ty#))))
+      [sym# (unparse-type ty#)])))</span>)
+
+<span class='d'>(declare Type? RClass? PrimitiveArray? RClass-&gt;Class parse-type symbol-&gt;Class
+         requires-resolving? -resolve Nil? Value? Value-&gt;Class Union? Intersection?)</span>
+
+<span class='d'>;Return a Class that generalises what this Clojure type will look like from Java,
+</span><span class='d'>;suitable  for use as a Java primitive array member type.
+</span><span class='d'>; 
+</span><span class='d'>; (Type-&gt;array-member-Class (parse-type &#39;nil)) =&gt; Object
+</span><span class='d'>; (Type-&gt;array-member-Class (parse-type &#39;(U nil Number))) =&gt; Number
+</span><span class='d'>; (Type-&gt;array-member-Class (parse-type &#39;(Array (U nil Number)))) =~&gt; (Array Number)
+</span>
+<span class='d'>;(ann Type-&gt;array-member-Class (Fn [Type -&gt; (Option Class)]
+</span><span class='d'>;                                  [Type Any -&gt; (Option Class)]))
+</span><span class='d'>(defn Type-&gt;array-member-Class 
+  ([ty] (Type-&gt;array-member-Class ty false))
+  ([ty nilok?]
+   {:pre [(Type? ty)]}
+   (cond
+     (requires-resolving? ty) (Type-&gt;array-member-Class (-resolve ty) nilok?)
+     (Nil? ty) (if nilok?
+                 nil
+                 Object)
+     (Value? ty) (Value-&gt;Class ty)
+     ;; handles most common case of (U nil Type)
+     (Union? ty) (let [clss (map #(Type-&gt;array-member-Class % true) (:types ty))
+                       prim-and-nil? (and (some nil? clss)
+                                          (some #(when % (.isPrimitive ^Class %)) clss))
+                       nonil-clss (remove nil? clss)]
+                   (if (and (= 1 (count nonil-clss))
+                            (not prim-and-nil?))
+                     (first nonil-clss)
+                     Object))
+     (Intersection? ty) Object
+     (RClass? ty) (RClass-&gt;Class ty)
+     (PrimitiveArray? ty) (class (make-array (Type-&gt;array-member-Class (:jtype ty) false) 0))
+     :else Object)))</span>
+
+<span class='d'>;(ann into-array&gt;* [Any Any -&gt; Any])
+</span>(<a id='647' tid='648' class='u'>defn</a> <a id='649' tid='650' class='u'>into-array&gt;*</a> 
+  <span class='d'>([cljt coll]
+   (into-array (-&gt; cljt parse-type Type-&gt;array-member-Class) coll))</span>
+  <span class='d'>([javat cljt coll]
+   (into-array (-&gt; javat parse-type Type-&gt;array-member-Class) coll))</span>)
+
+(<a id='609' tid='610' class='u'>defmacro</a> <a id='611' tid='612' class='u'>into-array&gt;</a> 
+  <span class='d'>&quot;Make a Java array with Java class javat and Typed Clojure type
+  cljt. Resulting array will be of type javat, but elements of coll must be under
+  cljt. cljt should be a subtype of javat (the same or more specific).&quot;</span>
+  ([<a id='613' tid='614' class='u'>cljt</a> <a id='615' tid='616' class='u'>coll</a>]
+   <a id='617' tid='618' class='u'>`</a>(<a id='619' tid='620' class='u'>into-array&gt;*</a> <a id='621' tid='622' class='u'>&#39;</a><a id='623' tid='624' class='u'>~cljt</a> <a id='625' tid='626' class='u'>~coll</a>))
+  ([<a id='627' tid='628' class='u'>javat</a> <a id='629' tid='630' class='u'>cljt</a> <a id='631' tid='632' class='u'>coll</a>]
+   <a id='633' tid='634' class='u'>`</a>(<a id='635' tid='636' class='u'>into-array&gt;*</a> <a id='637' tid='638' class='u'>&#39;</a><a id='639' tid='640' class='u'>~javat</a> <a id='641' tid='642' class='u'>&#39;</a><a id='643' tid='644' class='u'>~cljt</a> <a id='645' tid='646' class='u'>~coll</a>)))
+
+(<a id='365' tid='366' class='u'>defn</a> <a id='367' tid='368' class='u'>ann-form*</a> [<a id='369' tid='370' class='u'>form</a> <a id='371' tid='372' class='u'>ty</a>]
+  <a id='373' tid='374' class='u'>form</a>)
+
+(<a id='347' tid='348' class='u'>defmacro</a> <a id='349' tid='350' class='u'>ann-form</a> [<a id='351' tid='352' class='u'>form</a> <a id='353' tid='354' class='u'>ty</a>]
+  <a id='355' tid='356' class='u'>`</a>(<a id='357' tid='358' class='u'>ann-form*</a> <a id='359' tid='360' class='u'>~form</a> <a id='361' tid='362' class='u'>&#39;</a><a id='363' tid='364' class='u'>~ty</a>))
+
+<span class='d'>;(ann unsafe-ann-form* [Any Any -&gt; Any])
+</span><span class='d'>(defn unsafe-ann-form* [form ty]
+  form)</span>
+
+<span class='d'>(defmacro unsafe-ann-form [form ty]
+  `(unsafe-ann-form* ~form &#39;~ty))</span>
+
+<span class='d'>;(ann tc-ignore-forms* [Any -&gt; Any])
+</span>(<a id='821' tid='822' class='u'>defn</a> <a id='823' tid='824' class='u'>tc-ignore-forms*</a> [<a id='825' tid='826' class='u'>r</a>]
+  <a id='827' tid='828' class='u'>r</a>)
+
+<span class='d'>;; `do` is special at the top level
+</span>(<a id='791' tid='792' class='u'>defmacro</a> <a id='793' tid='794' class='u'>tc-ignore</a> 
+  <a id='795' tid='796' class='u'>&quot;Ignore forms in body during type checking&quot;</a>
+  [<a id='797' tid='798' class='u'>&</a> <a id='799' tid='800' class='u'>body</a>]
+  <a id='801' tid='802' class='u'>`</a>(<a id='803' tid='804' class='u'>do</a> <a id='805' tid='806' class='u'>~@</a>(<a id='807' tid='808' class='u'>map</a> (<a id='809' tid='810' class='u'>fn</a> [<a id='811' tid='812' class='u'>b</a>] <a id='813' tid='814' class='u'>`</a>(<a id='815' tid='816' class='u'>tc-ignore-forms*</a> <a id='817' tid='818' class='u'>~b</a>)) <a id='819' tid='820' class='u'>body</a>)))
+
+(<a id='687' tid='688' class='u'>defmacro</a> <a id='689' tid='690' class='u'>non-nil-return</a> 
+  <span class='d'>&quot;Override the return type of method msym to be non-nil.
+  Takes a set of relevant arities,
+  represented by the number of parameters it takes (rest parameter counts as one),
+  or :all which overrides all arities.
+  
+  eg.  (non-nil-return java.lang.Class/getDeclaredMethod :all)&quot;</span>
+  [<a id='691' tid='692' class='u'>msym</a> <a id='693' tid='694' class='u'>arities</a>]
+  <a id='695' tid='696' class='u'>`</a><span class='d'>(tc-ignore
+  (add-nonnilable-method-return &#39;~msym &#39;~arities))</span>)
+
+(<a id='677' tid='678' class='u'>defmacro</a> <a id='679' tid='680' class='u'>nilable-param</a> 
+  <span class='d'>&quot;Overrides which parameters in a method may accept
+  nilable values. If the parameter is a parameterised type or
+  an Array, this also declares the parameterised types and the Array type as nilable.
+
+  mmap is a map mapping arity parameter number to a set of parameter
+  positions (integers). If the map contains the key :all then this overrides
+  other entries. The key can also be :all, which declares all parameters nilable.&quot;</span>
+  [<a id='681' tid='682' class='u'>msym</a> <a id='683' tid='684' class='u'>mmap</a>]
+  <a id='685' tid='686' class='u'>`</a><span class='d'>(tc-ignore
+  (add-method-nilable-param &#39;~msym &#39;~mmap))</span>)
+
+<span class='d'>(declare abstract-many instantiate-many)</span>
+
+<span class='d'>(load &quot;typed/type_rep&quot;
+      &quot;typed/type_ops&quot;
+      &quot;typed/filter_rep&quot;
+      &quot;typed/filter_ops&quot;
+      &quot;typed/path_rep&quot;
+      &quot;typed/object_rep&quot;)</span>
+
+<span class='d'>; must be after type/object/filter definitions
+</span><span class='d'>(load &quot;typed/fold&quot;)</span>
+
+<span class='d'>;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+</span><span class='d'>;; Annotations
+</span>
+<span class='d'>(declare TCResult?)</span>
+
+<span class='d'>;(ann (predicate (APersistentMap Symbol Any)))
+</span><span class='d'>(def lex-env? (hash-c? (every-pred symbol? (complement namespace)) Type?))</span>
+
+<span class='d'>(defrecord PropEnv [l props]
+  &quot;A lexical environment l, props is a list of known propositions&quot;
+  [(lex-env? l)
+   (every? Filter? props)])</span>
+
+<span class='d'>(declare ^:dynamic *lexical-env*)</span>
+
+(<a id='773' tid='774' class='u'>defn</a> <a id='775' tid='776' class='u'>print-env</a> [<a id='777' tid='778' class='u'>debug-str</a>]
+  <a id='779' tid='780' class='u'>nil</a>)
+
+<span class='d'>(defn print-env*
+  ([] (print-env* *lexical-env*))
+  ([e]
+   {:pre [(PropEnv? e)]}
+   ;; DO NOT REMOVE
+   (prn {:env (into {} (for [[k v] (:l e)]
+                         [k (unparse-type v)]))
+         :props (map unparse-filter (:props e))})))</span>
+
+<span class='d'>(defonce VAR-ANNOTATIONS (atom {}))</span>
+<span class='d'>(def ^:dynamic *lexical-env* (-&gt;PropEnv {} []))</span>
+
+<span class='d'>(defmacro with-lexical-env [env & body]
+  `(binding [*lexical-env* ~env]
+     ~@body))</span>
+
+<span class='d'>(set-validator! VAR-ANNOTATIONS #(and (every? (every-pred symbol? namespace) (keys %))
+                                      (every? Type? (vals %))))</span>
+<span class='d'>(set-validator! #&#39;*lexical-env* PropEnv?)</span>
+
+(<a id='313' tid='314' class='u'>defmacro</a> <a id='315' tid='316' class='u'>ann</a> [<a id='317' tid='318' class='u'>varsym</a> <a id='319' tid='320' class='u'>typesyn</a>]
+  <span class='d'>`</span><span class='d'>(tc-ignore
+ (do (ensure-clojure)
+   (let [t# (parse-type &#39;~typesyn)
+         s# (if (namespace &#39;~varsym)
+              &#39;~varsym
+              (symbol (-&gt; *ns* ns-name str) (str &#39;~varsym)))]
+     (do (add-var-type s# t#)
+       [s# (unparse-type t#)]))))</span>)
+
+<span class='d'>(declare parse-type alter-class*)</span>
+
+<span class='d'>(defn parse-field [[n _ t]]
+  [n (parse-type t)])</span>
+
+<span class='d'>(defn gen-datatype* [provided-name fields variances args ancests]
+  `(do (ensure-clojure)
+  (let [provided-name-str# (str &#39;~provided-name)
+         ;_# (prn &quot;provided-name-str&quot; provided-name-str#)
+         munged-ns-str# (if (some #(= \. %) provided-name-str#)
+                          (apply str (butlast (apply concat (butlast (partition-by #(= \. %) provided-name-str#)))))
+                          (str (munge (-&gt; *ns* ns-name))))
+         ;_# (prn &quot;munged-ns-str&quot; munged-ns-str#)
+         demunged-ns-str# (str (clojure.repl/demunge munged-ns-str#))
+         ;_# (prn &quot;demunged-ns-str&quot; demunged-ns-str#)
+         local-name# (if (some #(= \. %) provided-name-str#)
+                       (symbol (apply str (last (partition-by #(= \. %) (str provided-name-str#)))))
+                       provided-name-str#)
+         ;_# (prn &quot;local-name&quot; local-name#)
+         s# (symbol (str munged-ns-str# \. local-name#))
+         fs# (apply array-map (apply concat (with-frees (mapv make-F &#39;~args)
+                                              (mapv parse-field (partition 3 &#39;~fields)))))
+         as# (set (with-frees (mapv make-F &#39;~args)
+                    (mapv parse-type &#39;~ancests)))
+         _# (add-datatype-ancestors s# as#)
+         pos-ctor-name# (symbol demunged-ns-str# (str &quot;-&gt;&quot; local-name#))
+         args# &#39;~args
+         vs# &#39;~variances
+         dt# (if args#
+               (Poly* args# (repeat (count args#) no-bounds)
+                      (-&gt;DataType s# vs# (map make-F args#) fs#)
+                      args#)
+               (-&gt;DataType s# nil nil fs#))
+         pos-ctor# (if args#
+                     (Poly* args# (repeat (count args#) no-bounds)
+                            (make-FnIntersection
+                              (make-Function (vec (vals fs#)) (-&gt;DataType s# vs# (map make-F args#) fs#)))
+                            args#)
+                     (make-FnIntersection
+                       (make-Function (vec (vals fs#)) dt#)))]
+     (do 
+       (when vs#
+         (let [f# (mapv make-F (repeatedly (count vs#) gensym))]
+           (alter-class* s# (RClass* (map :name f#) vs# f# s# {}))))
+       (add-datatype s# dt#)
+       (add-var-type pos-ctor-name# pos-ctor#)
+       [[s# (unparse-type dt#)]
+        [pos-ctor-name# (unparse-type pos-ctor#)]]))))</span>
+
+(<a id='321' tid='322' class='u'>defmacro</a> <a id='323' tid='324' class='u'>ann-datatype</a> <span class='d'>[dname fields & {ancests :unchecked-ancestors rplc :replace}]</span>
+  (<a id='325' tid='326' class='u'>assert</a> (<a id='327' tid='328' class='u'>not</a> <a id='329' tid='330' class='u'>rplc</a>) <a id='331' tid='332' class='u'>&quot;Replace NYI&quot;</a>)
+  (<a id='333' tid='334' class='u'>assert</a> (<a id='335' tid='336' class='u'>symbol?</a> <a id='337' tid='338' class='u'>dname</a>)
+          (<a id='339' tid='340' class='u'>str</a> <a id='341' tid='342' class='u'>&quot;Must provide name symbol: &quot;</a> <a id='343' tid='344' class='u'>dname</a>))
+  <a id='345' tid='346' class='u'>`</a><span class='d'>(tc-ignore
+     ~(gen-datatype* dname fields nil nil ancests))</span>)
+
+(<a id='375' tid='376' class='u'>defmacro</a> <a id='377' tid='378' class='u'>ann-pdatatype</a> <span class='d'>[dname vbnd fields & {ancests :unchecked-ancestors rplc :replace}]</span>
+  (<a id='379' tid='380' class='u'>assert</a> (<a id='381' tid='382' class='u'>not</a> <a id='383' tid='384' class='u'>rplc</a>) <a id='385' tid='386' class='u'>&quot;Replace NYI&quot;</a>)
+  (<a id='387' tid='388' class='u'>assert</a> (<a id='389' tid='390' class='u'>symbol?</a> <a id='391' tid='392' class='u'>dname</a>)
+          (<a id='393' tid='394' class='u'>str</a> <a id='395' tid='396' class='u'>&quot;Must provide local symbol: &quot;</a> <a id='397' tid='398' class='u'>dname</a>))
+  <a id='399' tid='400' class='u'>`</a><span class='d'>(tc-ignore
+     ~(gen-datatype* dname fields (map second vbnd) (map first vbnd) ancests))</span>)
+
+<span class='d'>(defn gen-protocol* [local-varsym variances args mths]
+  `(do (ensure-clojure)
+  (let [local-vsym# &#39;~local-varsym
+         s# (symbol (-&gt; *ns* ns-name str) (str local-vsym#))
+         on-class# (symbol (str (munge (namespace s#)) \. local-vsym#))
+         ; add a Name so the methods can be parsed
+         _# (declare-protocol* s#)
+         args# &#39;~args
+         fs# (when args# 
+               (map make-F args#))
+         ms# (into {} (for [[knq# v#] &#39;~mths]
+                        (do
+                          (assert (not (namespace knq#))
+                                  &quot;Protocol method should be unqualified&quot;)
+                          [knq# (with-frees fs# (parse-type v#))])))
+         t# (if fs#
+              (Poly* (map :name fs#) (repeat (count fs#) no-bounds) 
+                     (-&gt;Protocol s# &#39;~variances fs# on-class# ms#)
+                     (map :name fs#))
+              (-&gt;Protocol s# nil nil on-class# ms#))]
+     (do
+       (add-protocol s# t#)
+       (doseq [[kuq# mt#] ms#]
+         ;qualify method names when adding methods as vars
+         (let [kq# (symbol (-&gt; *ns* ns-name str) (str kuq#))]
+           (add-var-type kq# mt#)))
+       [s# (unparse-type t#)]))))</span>
+
+(<a id='407' tid='408' class='u'>defmacro</a> <a id='409' tid='410' class='u'>ann-protocol</a> <span class='d'>[local-varsym & {:as mth}]</span>
+  <span class='d'>(assert (not (or (namespace local-varsym)
+                   (some #{\.} (str local-varsym))))
+          (str &quot;Must provide local var name for protocol: &quot; local-varsym))</span>
+  <a id='411' tid='412' class='u'>`</a><span class='d'>(tc-ignore
+     ~(gen-protocol* local-varsym nil nil mth))</span>)
+
+(<a id='401' tid='402' class='u'>defmacro</a> <a id='403' tid='404' class='u'>ann-pprotocol</a> <span class='d'>[local-varsym vbnd & {:as mth}]</span>
+  <span class='d'>(assert (not (or (namespace local-varsym)
+                   (some #{\.} (str local-varsym))))
+          (str &quot;Must provide local var name for protocol: &quot; local-varsym))</span>
+  <a id='405' tid='406' class='u'>`</a><span class='d'>(tc-ignore
+     ~(gen-protocol* local-varsym (mapv second vbnd) (mapv first vbnd) mth))</span>)
+
+(<a id='697' tid='698' class='u'>defmacro</a> <a id='699' tid='700' class='u'>override-constructor</a> [<a id='701' tid='702' class='u'>ctorsym</a> <a id='703' tid='704' class='u'>typesyn</a>]
+  <a id='705' tid='706' class='u'>`</a><span class='d'>(tc-ignore
+   (do (ensure-clojure)
+     (let [t# (parse-type &#39;~typesyn)
+           s# &#39;~ctorsym]
+       (do (add-constructor-override s# t#)
+         [s# (unparse-type t#)]))))</span>)
+
+(<a id='707' tid='708' class='u'>defmacro</a> <a id='709' tid='710' class='u'>override-method</a> [<a id='711' tid='712' class='u'>methodsym</a> <a id='713' tid='714' class='u'>typesyn</a>]
+  <a id='715' tid='716' class='u'>`</a><span class='d'>(tc-ignore
+   (do (ensure-clojure)
+     (let [t# (parse-type &#39;~typesyn)
+           s# (if (namespace &#39;~methodsym)
+                &#39;~methodsym
+                (throw (Exception. &quot;Method name must be a qualified symbol&quot;)))]
+       (do (add-method-override s# t#)
+         [s# (unparse-type t#)]))))</span>)
+
+<span class='d'>(defn add-var-type [sym type]
+  (swap! VAR-ANNOTATIONS #(assoc % sym type))
+  nil)</span>
+
+<span class='d'>(defn lookup-local [sym]
+  (-&gt; *lexical-env* :l sym))</span>
+
+<span class='d'>(def ^:dynamic *var-annotations*)</span>
+
+<span class='d'>(defn lookup-Var [nsym]
+  (assert (contains? @*var-annotations* nsym) 
+          (str (when *current-env*
+                 (str (:line *current-env*) &quot;: &quot;))
+            &quot;Untyped var reference: &quot; nsym))
+  (@*var-annotations* nsym))</span>
+
+<span class='d'>(defn merge-locals [env new]
+  (-&gt; env
+    (update-in [:l] #(merge % new))))</span>
+
+<span class='d'>(defmacro with-locals [locals & body]
+  `(binding [*lexical-env* (merge-locals *lexical-env* ~locals)]
+     ~@body))</span>
+
+<span class='d'>(declare ^:dynamic *current-env*)</span>
+
+<span class='d'>(defn type-of [sym]
+  {:pre [(symbol? sym)]
+   :post [(or (Type? %)
+              (TCResult? %))]}
+  (cond
+    (not (namespace sym)) (if-let [t (lookup-local sym)]
+                            t
+                            (throw (Exception. (str (when *current-env*
+                                                      (str (:line *current-env*) &quot;: &quot;))
+                                                    &quot;Reference to untyped binding: &quot; sym))))
+    :else (lookup-Var sym)))</span>
+
+
+<span class='d'>(derive ::clojurescript ::default)</span>
+<span class='d'>(derive ::clojure ::default)</span>
+
+<span class='d'>(def TYPED-IMPL (atom ::clojure))</span>
+<span class='d'>(set-validator! TYPED-IMPL #(isa? % ::default))</span>
+
+<span class='d'>(defn ensure-clojure []
+  (reset! TYPED-IMPL ::clojure))</span>
+
+<span class='d'>(defn ensure-clojurescript []
+  (reset! TYPED-IMPL ::clojurescript))</span>
+
+<span class='d'>(defn checking-clojure? []
+  (= ::clojure @TYPED-IMPL))</span>
+
+<span class='d'>(defn checking-clojurescript? []
+  (= ::clojurescript @TYPED-IMPL))</span>
+
+<span class='d'>(load &quot;typed/dvar_env&quot;
+      &quot;typed/datatype_ancestor_env&quot;
+      &quot;typed/datatype_env&quot;
+      &quot;typed/protocol_env&quot;
+      &quot;typed/method_override_env&quot;
+      &quot;typed/ctor_override_env&quot;
+      &quot;typed/method_return_nilables&quot;
+      &quot;typed/method_param_nilables&quot;
+      &quot;typed/declared_kind_env&quot;
+      &quot;typed/name_env&quot;
+      &quot;typed/rclass_env&quot;
+      &quot;typed/mm_env&quot;)</span>
+
+<span class='d'>(load &quot;typed/constant_type&quot;
+      &quot;typed/parse&quot;
+      &quot;typed/unparse&quot;
+      &quot;typed/frees&quot;
+      &quot;typed/promote_demote&quot;
+      &quot;typed/cs_gen&quot;
+      &quot;typed/subst_dots&quot;
+      &quot;typed/infer&quot;
+      &quot;typed/tvar_rep&quot;
+      &quot;typed/subst&quot;
+      &quot;typed/trans&quot;
+      &quot;typed/inst&quot;
+      &quot;typed/subtype&quot;
+      &quot;typed/alter&quot;
+      &quot;typed/ann&quot;
+      &quot;typed/check&quot;
+      &quot;typed/check_cljs&quot;)</span>
+
+<span class='d'>;emit something that CLJS can display ie. a quoted unparsed typed
+</span><span class='d'>(defmacro cf-cljs
+  &quot;Type check a Clojurescript form and return its type&quot;
+  ([form]
+   (let [t
+         (do (ensure-clojurescript)
+           (-&gt; (ana-cljs {:locals {} :context :expr :ns {:name cljs/*cljs-ns*}} form) check-cljs expr-type unparse-TCResult))]
+     `&#39;~t))
+  ([form expected]
+   (let [t
+         (do (ensure-clojurescript)
+           (-&gt; (ana-cljs {:locals {} :context :expr :ns {:name cljs/*cljs-ns*}}
+                         (list `ann-form-cljs form expected))
+             (#(check-cljs % (ret (parse-type expected)))) expr-type unparse-TCResult))]
+     `&#39;~t)))</span>
+
+(<a id='413' tid='414' class='u'>defmacro</a> <a id='415' tid='416' class='u'>cf</a> 
+  <a id='417' tid='418' class='u'>&quot;Type check a Clojure form and return its type&quot;</a>
+  <span class='d'>([form]
+  `(do (ensure-clojure)
+     (tc-ignore
+       (-&gt; (ast ~form) hygienic/ast-hy check expr-type unparse-TCResult))))</span>
+  <span class='d'>([form expected]
+  `(do (ensure-clojure)
+     (tc-ignore
+       (-&gt; (ast (ann-form ~form ~expected)) hygienic/ast-hy (#(check % (ret (parse-type &#39;~expected)))) expr-type unparse-TCResult))))</span>)
+
+<span class='d'>(defn analyze-file-asts
+  [^String f]
+  (let [res (if (re-find #&quot;^file://&quot; f) (java.net.URL. f) (io/resource f))]
+    (assert res (str &quot;Can&#39;t find &quot; f &quot; in classpath&quot;))
+    (with-altered-specials
+      (binding [cljs/*cljs-ns* &#39;cljs.user
+                cljs/*cljs-file* (.getPath ^java.net.URL res)
+                *ns* cljs/*reader-ns*]
+        (with-open [r (io/reader res)]
+          (let [env (cljs/empty-env)
+                pbr (clojure.lang.LineNumberingPushbackReader. r)
+                eof (Object.)]
+            (loop [r (read pbr false eof false)
+                   asts []]
+              (let [env (assoc env :ns (cljs/get-namespace cljs/*cljs-ns*))]
+                (if-not (identical? eof r)
+                  (let [ast1 (cljs/analyze env r)]
+                    (recur (read pbr false eof false) (conj asts ast1)))
+                  asts)))))))))</span>
+
+<span class='d'>(defn check-cljs-ns*
+  &quot;Type check a CLJS namespace. If not provided default to current namespace&quot;
+  ([] (check-cljs-ns* cljs/*cljs-ns*))
+  ([nsym]
+   (ensure-clojurescript)
+   (let [asts (analyze-file-asts (cljs/ns-&gt;relpath nsym))]
+     (doseq [ast asts]
+       (check-cljs ast)))))</span>
+
+<span class='d'>(defmacro check-cljs-ns
+  ([] (check-cljs-ns*) `&#39;~&#39;success)
+  ([nsym] (check-cljs-ns* nsym) `&#39;~&#39;success))</span>
+
+(<a id='419' tid='420' class='u'>defn</a> <a id='421' tid='422' class='u'>check-ns</a> 
+  <span class='d'>&quot;Type check a namespace. If not provided default to current namespace&quot;</span>
+  ([] (<a id='423' tid='424' class='u'>check-ns</a> (<a id='425' tid='426' class='u'>ns-name</a> <a id='427' tid='428' class='u'>*ns*</a>)))
+  <span class='d'>([nsym]
+   (ensure-clojure)
+   (with-open [^clojure.lang.LineNumberingPushbackReader pbr (analyze/pb-reader-for-ns nsym)]
+     (let [[_ns-decl_ & asts] (-&gt;&gt; (analyze/analyze-ns pbr (analyze/uri-for-ns nsym) nsym)
+                                (map hygienic/ast-hy))]
+       (doseq [ast asts]
+         (check-expr ast)))))</span>)
+
+<span class='d'>(defn trepl []
+  (clojure.main/repl 
+    :eval (fn [f] 
+            (let [t (do (ensure-clojure)
+                      (-&gt; (analyze/analyze-form f) hygienic/ast-hy
+                        check expr-type unparse-TCResult))]
+              (prn t) 
+              (eval f)))))</span>
+
+<span class='d'>(comment 
+  (check-ns &#39;typed.test.example)
+
+  ; very slow because of update-composite
+  (check-ns &#39;typed.test.rbt)
+
+  (check-ns &#39;typed.test.macro)
+  (check-ns &#39;typed.test.conduit)
+  (check-ns &#39;typed.test.person)
+  (check-ns &#39;typed.test.core-logic)
+  (check-ns &#39;typed.test.ckanren)
+
+  (check-cljs-ns &#39;typed.test.logic)
+  )</span>
+
+</pre>
+</div>
+<div id="right" class="src">
+<pre>
+<a id='rightstart' tid='leftstart'></a>
+<span class='i'>(ns clojure.core.typed
+  (:require [clojure.pprint :as pprint])
+  (:refer-clojure :exclude [defrecord type]))</span>
+
+<span class='i'>;=============================================================
+</span><span class='i'>; # core.typed
+</span><span class='i'>;
+</span><span class='i'>; This is the main namespace for core.typed. This project is
+</span><span class='i'>; split into many internal namespaces. Here are some of the main ones:
+</span><span class='i'>;
+</span><span class='i'>; c.c.typed.base-env
+</span><span class='i'>;   The base global type environment. All base Var Annotations,
+</span><span class='i'>;   Java method annotations, Class overriding and other annotations
+</span><span class='i'>;   live here.
+</span><span class='i'>;
+</span><span class='i'>; c.c.typed.type-{rep,ctors}, c.c.parse-unparse,
+</span><span class='i'>; c.c.typed.fold-{rep,default}
+</span><span class='i'>;   Internal type representation and operations.
+</span><span class='i'>;   
+</span><span class='i'>; c.c.typed.check
+</span><span class='i'>;   The type checker.
+</span><span class='i'>;
+</span><span class='i'>; c.c.typed.cs-gen
+</span><span class='i'>;   Polymorphic local type inference algorithm.
+</span>
+<span class='i'>;=============================================================
+</span><span class='i'>; # Internal Loading
+</span>
+<span class='i'>; ## Lazy Loading
+</span><span class='i'>;
+</span><span class='i'>; We handle lazy loading by moving all of c.c.typed&#39;s namespace
+</span><span class='i'>; dependencies to c.c.typed.init. We assume that
+</span><span class='i'>; if c.c.typed.init exists, then core.typed is fully loaded.
+</span><span class='i'>; Does this work with namespaces reloading tools like tools.namespace?
+</span><span class='i'>;
+</span><span class='i'>; By default, core.typed only loads:
+</span><span class='i'>; - c.c.typed macros (eg. `doseq&gt;`, `for&gt;`)
+</span><span class='i'>; - c.c.typed internal marker functions
+</span><span class='i'>;
+</span><span class='i'>; Code that requires anything further than this (eg. type checking) 
+</span><span class='i'>; must load *all* of core.typed with `load-if-needed`.
+</span>
+<span class='i'>(defn load-if-needed 
+  &quot;Load and initialize all of core.typed if not already&quot;
+  []
+  (when-not (find-ns &#39;clojure.core.typed.init)
+    (println &quot;Initializing core.typed ...&quot;)
+    (flush)
+    (require &#39;clojure.core.typed.init)
+    (println &quot;core.typed initialized.&quot;)
+    (flush)))</span>
+
+<span class='i'>; ## Base alias vars
+</span><span class='i'>;
+</span><span class='i'>; Type aliases are resolved using possibly-unbound Vars. We get around
+</span><span class='i'>; having to load c.c.typed.base-env by interning each alias&#39; Var in c.c.typed
+</span><span class='i'>; here. This way the user can refer the base alias Vars without necessarily loading
+</span><span class='i'>; all of core.typed.
+</span><span class='i'>;
+</span><span class='i'>; ### Consistency
+</span><span class='i'>;
+</span><span class='i'>; `-base-aliases` is ensured not to get out of date.
+</span><span class='i'>; c.c.typed.base-env asserts that -base-aliases is kept in sync with the
+</span><span class='i'>; actual set of aliases defined in the c.c.typed namespace. ie. adding
+</span><span class='i'>; a new alias in c.c.typed.base-env without updating `-base-aliases` throws an internal error.
+</span><span class='i'>;
+</span><span class='i'>; ### Visibility level
+</span><span class='i'>;
+</span><span class='i'>; `-base-aliases` is not private because it is used from c.c.typed.base-env.
+</span>
+<span class='i'>(def -base-aliases
+  &quot;Internal use only.&quot;
+  &#39;#{Option AnyInteger AnyPrimitive Atom1})</span>
+
+<span class='i'>(doseq [v -base-aliases]
+  (intern &#39;clojure.core.typed v))</span>
+
+<span class='i'>;=============================================================
+</span><span class='i'>; Query functions
+</span>
+<span class='i'>; Usually query functions need to force core.typed to fully load.
+</span><span class='i'>; To be as lazy as possible, we use `ns-resolve` to grab the Vars
+</span><span class='i'>; we need.
+</span>
+<span class='i'>;(ann method-type [Symbol -&gt; nil])
+</span>(<a id='672' tid='671' class='u'>defn</a> <a id='674' tid='673' class='u'>method-type</a>
+  <span class='i'>&quot;Given a method symbol, print the core.typed types assigned to it.
+  Intended for use at the REPL.&quot;</span>
+  [<a id='676' tid='675' class='u'>mname</a>]
+  <span class='i'>(load-if-needed)</span>
+  (<span class='i'>let</span> [<span class='i'>type-reflect</span> <span class='i'>@</span><span class='i'>(ns-resolve (find-ns &#39;clojure.reflect) 
+                                  &#39;type-reflect)</span>
+        <span class='i'>unparse-type</span> <span class='i'>@</span><span class='i'>(ns-resolve (find-ns &#39;clojure.core.typed.parse-unparse)
+                                  &#39;unparse-type)</span>
+        <span class='i'>Method-&gt;Type</span> <span class='i'>@</span><span class='i'>(ns-resolve (find-ns &#39;clojure.core.typed.check)
+                                  &#39;Method-&gt;Type)</span>
+        <span class='i'>ms</span> (<span class='i'>-&gt;&gt;</span> <span class='i'>(type-reflect (Class/forName (namespace mname)))</span>
+             <span class='i'>:members</span>
+             (<a id='172' tid='171' class='m'>filter</a> <a id='174' tid='173' class='m'>#</a>(<a id='176' tid='175' class='m'>and</a> (<a id='178' tid='177' class='m'>instance?</a> <a id='180' tid='179' class='m'>clojure.reflect.Method</a> <a id='182' tid='181' class='m'>%</a>)
+                           (<a id='184' tid='183' class='m'>=</a> (<a id='186' tid='185' class='m'>str</a> (<a id='188' tid='187' class='m'>:name</a> <a id='190' tid='189' class='m'>%</a>)) (<a id='192' tid='191' class='m'>name</a> <a id='194' tid='193' class='m'>mname</a>))))
+             <span class='i'>set</span>)
+        <span class='i'>_</span> (<a id='148' tid='147' class='m'>assert</a> (<a id='150' tid='149' class='m'>seq</a> <a id='152' tid='151' class='m'>ms</a>) (<a id='154' tid='153' class='m'>str</a> <a id='156' tid='155' class='m'>&quot;Method &quot;</a> <a id='158' tid='157' class='m'>mname</a> <a id='160' tid='159' class='m'>&quot; not found&quot;</a>))]
+    <span class='i'>(println &quot;Method name:&quot; mname)</span>
+    <span class='i'>(flush)</span>
+    <span class='i'>(doseq [m ms]
+      (println (unparse-type
+                 (Method-&gt;Type m)))
+      (flush))</span>))
+
+
+<span class='i'>;=============================================================
+</span><span class='i'>; Special functions
+</span>
+(<a id='782' tid='781' class='u'>defn</a> <a id='784' tid='783' class='u'>print-filterset</a>
+  <span class='i'>&quot;During type checking, print the filter set attached to form, 
+  preceeded by literal string debug-string&quot;</span>
+  [<a id='786' tid='785' class='u'>debug-string</a> <a id='788' tid='787' class='u'>frm</a>]
+  <a id='790' tid='789' class='u'>frm</a>)
+
+(<a id='590' tid='589' class='u'>defn</a> <a id='592' tid='591' class='u'>inst-poly</a> 
+  <span class='i'>&quot;Internal use only. Use inst.&quot;</span>
+  [<a id='594' tid='593' class='u'>inst-of</a> <a id='596' tid='595' class='u'>types-syn</a>]
+  <a id='598' tid='597' class='u'>inst-of</a>)
+
+(<a id='600' tid='599' class='u'>defn</a> <a id='602' tid='601' class='u'>inst-poly-ctor</a> 
+  <span class='i'>&quot;Internal use only. Use inst-ctor&quot;</span>
+  [<a id='604' tid='603' class='u'>inst-of</a> <a id='606' tid='605' class='u'>types-syn</a>]
+  <a id='608' tid='607' class='u'>inst-of</a>)
+
+(<a id='546' tid='545' class='u'>defmacro</a> <a id='548' tid='547' class='u'>inst</a> 
+  <a id='550' tid='549' class='u'>&quot;Instantiate a polymorphic type with a number of types&quot;</a>
+  [<a id='552' tid='551' class='u'>inst-of</a> <a id='554' tid='553' class='u'>&</a> <a id='556' tid='555' class='u'>types</a>]
+  <a id='558' tid='557' class='u'>`</a>(<a id='560' tid='559' class='u'>inst-poly</a> <a id='562' tid='561' class='u'>~inst-of</a> <a id='564' tid='563' class='u'>&#39;</a><a id='566' tid='565' class='u'>~types</a>))
+
+(<a id='568' tid='567' class='u'>defmacro</a> <a id='570' tid='569' class='u'>inst-ctor</a>
+  <a id='572' tid='571' class='u'>&quot;Instantiate a call to a constructor with a number of types.
+  First argument must be an immediate call to a constructor.&quot;</a>
+  [<a id='574' tid='573' class='u'>inst-of</a> <a id='576' tid='575' class='u'>&</a> <a id='578' tid='577' class='u'>types</a>]
+  <a id='580' tid='579' class='u'>`</a>(<a id='582' tid='581' class='u'>inst-poly-ctor</a> <a id='584' tid='583' class='u'>~inst-of</a> <a id='586' tid='585' class='u'>&#39;</a><a id='588' tid='587' class='u'>~types</a>))
+
+(<a id='536' tid='535' class='u'>defn</a> <a id='538' tid='537' class='u'>fn&gt;-ann</a> 
+  <span class='i'>&quot;Internal use only. Use fn&gt;.&quot;</span>
+  [<a id='540' tid='539' class='u'>fn-of</a> <a id='542' tid='541' class='u'>param-types-syn</a>]
+  <a id='544' tid='543' class='u'>fn-of</a>)
+
+(<a id='762' tid='761' class='u'>defn</a> <a id='764' tid='763' class='u'>pfn&gt;-ann</a> 
+  <span class='i'>&quot;Internal use only. Use pfn&gt;.&quot;</span>
+  [<a id='766' tid='765' class='u'>fn-of</a> <a id='768' tid='767' class='u'>polys</a> <a id='770' tid='769' class='u'>param-types-syn</a>]
+  <a id='772' tid='771' class='u'>fn-of</a>)
+
+(<a id='662' tid='661' class='u'>defn</a> <a id='664' tid='663' class='u'>loop&gt;-ann</a> 
+  <span class='i'>&quot;Internal use only. Use loop&gt;&quot;</span>
+  [<a id='666' tid='665' class='u'>loop-of</a> <a id='668' tid='667' class='u'>bnding-types</a>]
+  <a id='670' tid='669' class='u'>loop-of</a>)
+
+<span class='i'>(defmacro dotimes&gt;
+  &quot;Like dotimes.&quot;
+  [bindings & body]
+  (@#&#39;clojure.core/assert-args
+     (vector? bindings) &quot;a vector for its binding&quot;
+     (= 2 (count bindings)) &quot;exactly 2 forms in binding vector&quot;)
+  (let [i (first bindings)
+        n (second bindings)]
+    `(let [n# (long ~n)]
+       (loop&gt; [~i :- (~&#39;U Long Integer) 0]
+         (when (&lt; ~i n#)
+           ~@body
+           (recur (unchecked-inc ~i)))))))</span>
+
+<span class='i'>(defmacro for&gt;
+  &quot;Like for but requires annotation for each loop variable: [a [1 2]] becomes [a :- Long [1 2]]
+  Also requires annotation for return type.
+  
+  eg.
+  (for&gt; :- Number
+        [a :- (U nil AnyInteger) [1 nil 2 3]
+         :when a]
+     (inc a))&quot;
+  [tk ret-ann seq-exprs body-expr]
+  (@#&#39;clojure.core/assert-args
+     (vector? seq-exprs) &quot;a vector for its binding&quot;
+     (even? (count seq-exprs)) &quot;an even number of forms in binding vector&quot;)
+  (assert (#{:-} tk) &quot;Must provide return type annotation for for&gt;.&quot;)
+  (let [normalise-args
+        ; change [a :- b c] to [[a :- b] c]
+        (fn [seq-exprs]
+          (loop [flat-result ()
+                 seq-exprs seq-exprs]
+            (cond
+              (empty? seq-exprs) flat-result
+              (keyword? (first seq-exprs)) (recur (concat flat-result (take 2 seq-exprs))
+                                                  (drop 2 seq-exprs))
+              (and (vector? (first seq-exprs))
+                   (#{:-} (-&gt; seq-exprs first second))) (do
+                                                          (prn &quot;DEPRECATED WARNING: for&gt; syntax has changed, use [b :- t i] for clauses&quot;)
+                                                          (recur (concat flat-result (take 2 seq-exprs))
+                                                                 (drop 2 seq-exprs)))
+              :else (do (assert (#{:-} (second seq-exprs))
+                                &quot;Incorrect syntax in for&gt;.&quot;)
+                        (recur (concat flat-result [(vec (take 3 seq-exprs))
+                                                    (nth seq-exprs 3)])
+                               (drop 4 seq-exprs))))))
+
+        ; normalise seq-exprs to be flat pairs
+        seq-exprs (normalise-args seq-exprs)
+
+        to-groups (fn [seq-exprs]
+                    (@#&#39;clojure.core/reduce1 (fn [groups [k v]]
+                                               (if (keyword? k)
+                                                 (conj (pop groups) (conj (peek groups) [k v]))
+                                                 (conj groups [k v])))
+                                             [] (partition 2 seq-exprs)))
+        err (fn [& msg] (throw (IllegalArgumentException. ^String (apply str msg))))
+        emit-bind (fn emit-bind [[[bind expr & mod-pairs]
+                                  & [[_ next-expr] :as next-groups]]]
+                    (let [_ (assert (and (vector? bind)
+                                         (#{3} (count bind))
+                                         (#{:-} (second bind))) 
+                                    &quot;Binder must be of the form [lhs :- type]&quot;)
+                          bind-ann (nth bind 2)
+                          bind (nth bind 0)
+                          giter (gensym &quot;iter__&quot;)
+                          gxs (gensym &quot;s__&quot;)
+                          do-mod (fn do-mod [[[k v :as pair] & etc]]
+                                   (cond
+                                     (= k :let) `(let ~v ~(do-mod etc))
+                                     (= k :while) `(when ~v ~(do-mod etc))
+                                     (= k :when) `(if ~v
+                                                    ~(do-mod etc)
+                                                    (recur (rest ~gxs)))
+                                     (keyword? k) (err &quot;Invalid &#39;for&#39; keyword &quot; k)
+                                     next-groups
+                                      `(let [iterys# ~(emit-bind next-groups)
+                                             fs# (seq (iterys# ~next-expr))]
+                                         (if fs#
+                                           (concat fs# (~giter (rest ~gxs)))
+                                           (recur (rest ~gxs))))
+                                     :else `(cons ~body-expr
+                                                  (~giter (rest ~gxs)))))]
+                      (if next-groups
+                        #_&quot;not the inner-most loop&quot;
+                        `(ann-form
+                           (fn ~giter [~gxs]
+                             (lazy-seq
+                               (loop&gt; [~gxs :- (~&#39;clojure.core.typed/Option (~&#39;clojure.lang.Seqable ~bind-ann)) ~gxs]
+                                 (when-first [~bind ~gxs]
+                                   ~(do-mod mod-pairs)))))
+                           [(~&#39;clojure.core.typed/Option (~&#39;clojure.lang.Seqable ~bind-ann)) ~&#39;-&gt; (~&#39;clojure.lang.LazySeq ~ret-ann)])
+                        #_&quot;inner-most loop&quot;
+                        (let [gi (gensym &quot;i__&quot;)
+                              gb (gensym &quot;b__&quot;)
+                              do-cmod (fn do-cmod [[[k v :as pair] & etc]]
+                                        (cond
+                                          (= k :let) `(let ~v ~(do-cmod etc))
+                                          (= k :while) `(when ~v ~(do-cmod etc))
+                                          (= k :when) `(if ~v
+                                                         ~(do-cmod etc)
+                                                         (recur
+                                                           (unchecked-inc ~gi)))
+                                          (keyword? k)
+                                            (err &quot;Invalid &#39;for&#39; keyword &quot; k)
+                                          :else
+                                            `(do (chunk-append ~gb 
+                                                               ; put an ann-form here so at least one error message
+                                                               ; points to code the user can recognise.
+                                                               (ann-form ~body-expr
+                                                                         ~ret-ann))
+                                                 (recur (unchecked-inc ~gi)))))]
+                          `(ann-form
+                             (fn ~giter [~gxs]
+                               (lazy-seq
+                                 (loop&gt; [~gxs :- (~&#39;clojure.core.typed/Option (~&#39;clojure.lang.Seqable ~bind-ann)) ~gxs]
+                                        (when-let [~gxs (seq ~gxs)]
+                                          (if (chunked-seq? ~gxs)
+                                            (let [c# (chunk-first ~gxs)
+                                                  size# (int (count c#))
+                                                  ~gb (ann-form (chunk-buffer size#)
+                                                                (~&#39;clojure.lang.ChunkBuffer ~ret-ann))]
+                                              (if (loop&gt; [~gi :- (~&#39;U ~&#39;Long ~&#39;Integer) (int 0)]
+                                                         (if (&lt; ~gi size#)
+                                                           (let [;~bind (.nth c# ~gi)]
+                                                                 ~bind (nth c# ~gi)]
+                                                             ~(do-cmod mod-pairs))
+                                                           true))
+                                                (chunk-cons
+                                                  (chunk ~gb)
+                                                  (~giter (chunk-rest ~gxs)))
+                                                (chunk-cons (chunk ~gb) nil)))
+                                            (let [~bind (first ~gxs)]
+                                              ~(do-mod mod-pairs)))))))
+                             [(~&#39;clojure.core.typed/Option (~&#39;clojure.lang.Seqable ~bind-ann)) ~&#39;-&gt;
+                              (~&#39;clojure.lang.LazySeq ~ret-ann)])))))]
+    `(let [iter# ~(emit-bind (to-groups seq-exprs))]
+        (iter# ~(second seq-exprs)))))</span>
+
+<span class='i'>(defmacro doseq&gt;
+  &quot;Like doseq but requires annotation for each loop variable: 
+  [a [1 2]] becomes [a :- Long [1 2]]
+  
+  eg.
+  (doseq&gt; [a :- (U nil AnyInteger) [1 nil 2 3]
+           :when a]
+     (inc a))&quot;
+  [seq-exprs & body]
+  (@#&#39;clojure.core/assert-args
+     (vector? seq-exprs) &quot;a vector for its binding&quot;
+     (even? (count seq-exprs)) &quot;an even number of forms in binding vector&quot;)
+  (let [normalise-args
+        ; change [a :- b c] to [[a :- b] c]
+        (fn [seq-exprs]
+          (loop [flat-result ()
+                 seq-exprs seq-exprs]
+            (cond
+              (empty? seq-exprs) flat-result
+              (keyword? (first seq-exprs)) (recur (concat flat-result (take 2 seq-exprs))
+                                                  (drop 2 seq-exprs))
+              (and (vector? (first seq-exprs))
+                   (#{:-} (-&gt; seq-exprs first second))) (do
+                                                          (prn &quot;DEPRECATED WARNING: doseq&gt; syntax has changed, use [b :- t i] for clauses&quot;)
+                                                          (recur (concat flat-result (take 2 seq-exprs))
+                                                                 (drop 2 seq-exprs)))
+              :else (do (assert (#{:-} (second seq-exprs))
+                                &quot;Incorrect syntax in doseq&gt;&quot;)
+                        (recur (concat flat-result [(vec (take 3 seq-exprs))
+                                                    (nth seq-exprs 3)])
+                               (drop 4 seq-exprs))))))
+
+        ; normalise seq-exprs to be flat pairs
+        seq-exprs (normalise-args seq-exprs)
+        step (fn step [recform exprs]
+               (if-not exprs
+                 [true `(do ~@body)]
+                 (let [k (first exprs)
+                       v (second exprs)]
+                   (if (keyword? k)
+                     (let [steppair (step recform (nnext exprs))
+                           needrec (steppair 0)
+                           subform (steppair 1)]
+                       (cond
+                         (= k :let) [needrec `(let ~v ~subform)]
+                         (= k :while) [false `(when ~v
+                                                ~subform
+                                                ~@(when needrec [recform]))]
+                         (= k :when) [false `(if ~v
+                                               (do
+                                                 ~subform
+                                                 ~@(when needrec [recform]))
+                                               ~recform)]))
+                     ;; k is [k :- k-ann]
+                     (let [_ (assert (and (vector? k)
+                                          (#{3} (count k))
+                                          (#{:-} (second k))) 
+                                     &quot;Binder must be of the form [lhs :- type]&quot;)
+                           k-ann (nth k 2)
+                           k (nth k 0)
+                           ; k is the lhs binding
+                           seq- (gensym &quot;seq_&quot;)
+                           chunk- (with-meta (gensym &quot;chunk_&quot;)
+                                             {:tag &#39;clojure.lang.IChunk})
+                           count- (gensym &quot;count_&quot;)
+                           i- (gensym &quot;i_&quot;)
+                           recform `(recur (next ~seq-) nil 0 0)
+                           steppair (step recform (nnext exprs))
+                           needrec (steppair 0)
+                           subform (steppair 1)
+                           recform-chunk 
+                             `(recur ~seq- ~chunk- ~count- (unchecked-inc ~i-))
+                           steppair-chunk (step recform-chunk (nnext exprs))
+                           subform-chunk (steppair-chunk 1)]
+                       [true
+                        `(loop&gt; [~seq- :- (~&#39;U nil (~&#39;clojure.lang.Seqable ~k-ann)) (seq ~v), 
+                                 ~chunk- :- (~&#39;U nil (~&#39;clojure.lang.IChunk ~k-ann)) nil
+                                 ~count- :- ~&#39;(U Integer Long) 0,
+                                 ~i- :- ~&#39;(U Integer Long) 0]
+                           (if (and (&lt; ~i- ~count-)
+                                    ;; core.typed thinks chunk- could be nil here
+                                    ~chunk-)
+                             (let [;~k (.nth ~chunk- ~i-)
+                                   ~k (nth ~chunk- ~i-)]
+                               ~subform-chunk
+                               ~@(when needrec [recform-chunk]))
+                             (when-let [~seq- (seq ~seq-)]
+                               (if (chunked-seq? ~seq-)
+                                 (let [c# (chunk-first ~seq-)]
+                                   (recur (chunk-rest ~seq-) c#
+                                          (int (count c#)) (int 0)))
+                                 (let [~k (first ~seq-)]
+                                   ~subform
+                                   ~@(when needrec [recform]))))))])))))]
+    (nth (step nil (seq seq-exprs)) 1)))</span>
+
+<span class='i'>;(ann parse-fn&gt; [Any (Seqable Any) -&gt;
+</span><span class='i'>;                &#39;{:poly Any
+</span><span class='i'>;                  :fn Any ;Form
+</span><span class='i'>;                  :parsed-methods (Seqable &#39;{:dom-syntax (Seqable Any)
+</span><span class='i'>;                                             :dom-lhs (Seqable Any)
+</span><span class='i'>;                                             :rng-syntax Any
+</span><span class='i'>;                                             :has-rng? Any
+</span><span class='i'>;                                             :body Any})}])
+</span><span class='i'>;for
+</span>(<a id='196' tid='195' class='m'>defn-</a> <a id='198' tid='197' class='m'>parse-fn&gt;</a>
+  <a id='200' tid='199' class='m'>&quot;(fn&gt; name? :- type? [[param :- type]* & [param :- type *]?] exprs*)
+  (fn&gt; name? (:- type? [[param :- type]* & [param :- type *]?] exprs*)+)&quot;</a>
+  [<a id='202' tid='201' class='m'>is-poly</a> <a id='204' tid='203' class='m'>forms</a>]
+  (<a id='206' tid='205' class='m'>let</a> [<span class='i'>name</span> (<a id='208' tid='207' class='m'>when</a> (<a id='210' tid='209' class='m'>symbol?</a> (<a id='212' tid='211' class='m'>first</a> <a id='214' tid='213' class='m'>forms</a>))
+               (<a id='216' tid='215' class='m'>first</a> <a id='218' tid='217' class='m'>forms</a>))
+        <span class='i'>forms</span> (<a id='162' tid='161' class='m'>if</a> <a id='164' tid='163' class='m'>name</a> (<a id='166' tid='165' class='m'>rest</a> <a id='168' tid='167' class='m'>forms</a>) <a id='170' tid='169' class='m'>forms</a>)
+        <span class='i'>poly</span> <span class='i'>(when is-poly
+               (first forms))</span>
+        <span class='i'>forms</span> (<a id='138' tid='137' class='m'>if</a> <a id='140' tid='139' class='m'>poly</a> (<a id='142' tid='141' class='m'>rest</a> <a id='144' tid='143' class='m'>forms</a>) <a id='146' tid='145' class='m'>forms</a>)
+        <span class='i'>methods</span> (<a id='120' tid='119' class='m'>if</a> ((<a id='122' tid='121' class='m'>some-fn</a> <a id='124' tid='123' class='m'>vector?</a> <a id='126' tid='125' class='m'>keyword?</a>) (<a id='128' tid='127' class='m'>first</a> <a id='130' tid='129' class='m'>forms</a>))
+                  (<a id='132' tid='131' class='m'>list</a> <a id='134' tid='133' class='m'>forms</a>)
+                  <a id='136' tid='135' class='m'>forms</a>)
+        <span class='i'>; turn [param :- type* & param :- type *?]
+</span>        <span class='i'>; into [[param :- type]* & [param :- type *]?]
+</span>        <span class='i'>normalise-args</span>
+        <span class='i'>(fn [arg-anns]
+          (loop [flat-result ()
+                 seq-exprs arg-anns]
+            (cond
+              (empty? seq-exprs) flat-result
+              (and (#{&#39;&} (first seq-exprs))
+                   ; new syntax
+                   (#{:-} (nth seq-exprs 2)))
+              (do
+                (assert (#{&#39;*} (nth seq-exprs 4)))
+                (assert (#{:-} (nth seq-exprs 2)))
+                (assert (empty? (drop 5 seq-exprs)))
+                (recur (concat flat-result [&#39;& (vec (take 4 (next seq-exprs)))])
+                       (drop 4 seq-exprs)))
+              ;old syntax
+              (#{&#39;&} (first seq-exprs))
+              (do 
+                (assert (#{2} (count seq-exprs)))
+                (prn &quot;DEPRECATED WARNING: fn&gt; syntax has changed, use [& b :- t i *] for rest arguments&quot;
+                     &quot;ns: &quot; *ns*)
+                (recur (concat flat-result [&#39;& (second seq-exprs)])
+                       (drop 1 seq-exprs)))
+              (and (vector? (first seq-exprs))
+                   (#{:-} (-&gt; seq-exprs first second))) (do
+                                                          (prn &quot;DEPRECATED WARNING: fn&gt; syntax has changed, use [b :- t i] for clauses&quot;
+                                                               &quot;ns: &quot; *ns*)
+                                                          (recur (concat flat-result (take 1 seq-exprs))
+                                                                 (drop 1 seq-exprs)))
+              :else (do (assert (#{:-} (second seq-exprs))
+                                &quot;Incorrect syntax in fn&gt;.&quot;)
+                        (recur (concat flat-result [(vec (take 3 seq-exprs))])
+                               (drop 3 seq-exprs))))))</span>
+        <span class='i'>;(fn&gt; name? (:- type? [[param :- type]* & [param :- type *]?] exprs*)+)&quot;
+</span>        <span class='i'>; (HMap {:dom (Seqable TypeSyntax)
+</span>        <span class='i'>;        :rng (U nil TypeSyntax)
+</span>        <span class='i'>;        :body Any})
+</span>        <span class='i'>parsed-methods</span> (<a id='26' tid='25' class='m'>doall</a> 
+                         (<a id='28' tid='27' class='m'>for</a> [<a id='30' tid='29' class='m'>method</a> <a id='32' tid='31' class='m'>methods</a>]
+                           (<a id='34' tid='33' class='m'>let</a> [<span class='i'>[ret has-ret?]</span> (<a id='36' tid='35' class='m'>when</a> (<a id='38' tid='37' class='m'>not</a> (<a id='40' tid='39' class='m'>vector?</a> (<a id='42' tid='41' class='m'>first</a> <a id='44' tid='43' class='m'>method</a>)))
+                                                  (<a id='46' tid='45' class='m'>assert</a> (<a id='48' tid='47' class='m'>=</a> <a id='50' tid='49' class='m'>:-</a> (<a id='52' tid='51' class='m'>first</a> <a id='54' tid='53' class='m'>method</a>))
+                                                          <a id='56' tid='55' class='m'>&quot;Return type for fn&gt; must be prefixed by :-&quot;</a>)
+                                                  [(<a id='58' tid='57' class='m'>second</a> <a id='60' tid='59' class='m'>method</a>) <a id='62' tid='61' class='m'>true</a>])
+                                 <span class='i'>method</span> (<a id='16' tid='15' class='m'>if</a> <a id='18' tid='17' class='m'>ret</a> 
+                                          (<a id='20' tid='19' class='m'>nnext</a> <a id='22' tid='21' class='m'>method</a>)
+                                          <a id='24' tid='23' class='m'>method</a>)
+                                 <span class='i'>body</span> <span class='i'>(rest method)</span>
+                                 <span class='i'>arg-anns</span> <span class='i'>(normalise-args (first method))</span>
+                                 <span class='i'>[required-params _ [rest-param]]</span> (<a id='2' tid='1' class='m'>split-with</a> <a id='4' tid='3' class='m'>#</a>(<a id='6' tid='5' class='m'>not=</a> <a id='8' tid='7' class='m'>&#39;</a><a id='10' tid='9' class='m'>&</a> <a id='12' tid='11' class='m'>%</a>) <a id='14' tid='13' class='m'>arg-anns</a>)]
+                             (<a id='64' tid='63' class='m'>assert</a> (<a id='66' tid='65' class='m'>sequential?</a> <a id='68' tid='67' class='m'>required-params</a>)
+                                     <a id='70' tid='69' class='m'>&quot;Must provide a sequence of typed parameters to fn&gt;&quot;</a>)
+                             (<a id='72' tid='71' class='m'>assert</a> (<a id='74' tid='73' class='m'>not</a> <a id='76' tid='75' class='m'>rest-param</a>) <a id='78' tid='77' class='m'>&quot;fn&gt; doesn&#39;t support rest parameters yet&quot;</a>)
+                             <a id='80' tid='79' class='m'>{</a><a id='82' tid='81' class='m'>:dom-syntax</a> (<a id='84' tid='83' class='m'>doall</a> (<a id='86' tid='85' class='m'>map</a> (<a id='88' tid='87' class='m'>comp</a> <a id='90' tid='89' class='m'>second</a> <a id='92' tid='91' class='m'>next</a>) <a id='94' tid='93' class='m'>required-params</a>))
+                              <a id='96' tid='95' class='m'>:dom-lhs</a> (<a id='98' tid='97' class='m'>doall</a> (<a id='100' tid='99' class='m'>map</a> <a id='102' tid='101' class='m'>first</a> <a id='104' tid='103' class='m'>required-params</a>))
+                              <a id='106' tid='105' class='m'>:rng-syntax</a> <a id='108' tid='107' class='m'>ret</a>
+                              <a id='110' tid='109' class='m'>:has-rng?</a> <a id='112' tid='111' class='m'>has-ret?</a>
+                              <a id='114' tid='113' class='m'>:body</a> <a id='116' tid='115' class='m'>body</a><a id='118' tid='117' class='m'>}</a>)))]
+    <a id='220' tid='219' class='m'>{</a><a id='222' tid='221' class='m'>:poly</a> <a id='224' tid='223' class='m'>poly</a>
+     <a id='226' tid='225' class='m'>:fn</a> <a id='228' tid='227' class='m'>`</a>(<a id='230' tid='229' class='m'>fn</a> <a id='232' tid='231' class='m'>~@</a>(<a id='234' tid='233' class='m'>concat</a>
+                  (<a id='236' tid='235' class='m'>when</a> <a id='238' tid='237' class='m'>name</a>
+                    [<a id='240' tid='239' class='m'>name</a>])
+                  (<a id='242' tid='241' class='m'>for</a> [<a id='244' tid='243' class='m'>{</a><a id='246' tid='245' class='m'>:keys</a> [<a id='248' tid='247' class='m'>body</a> <a id='250' tid='249' class='m'>dom-lhs</a>]<a id='252' tid='251' class='m'>}</a> <a id='254' tid='253' class='m'>parsed-methods</a>]
+                    (<a id='256' tid='255' class='m'>apply</a> <a id='258' tid='257' class='m'>list</a> (<a id='260' tid='259' class='m'>vec</a> <a id='262' tid='261' class='m'>dom-lhs</a>) <a id='264' tid='263' class='m'>body</a>))))
+     <a id='266' tid='265' class='m'>:parsed-methods</a> <a id='268' tid='267' class='m'>parsed-methods</a><a id='270' tid='269' class='m'>}</a>))
+
+(<a id='718' tid='717' class='u'>defmacro</a> <a id='720' tid='719' class='u'>pfn&gt;</a> 
+  <a id='722' tid='721' class='u'>&quot;Define a polymorphic typed anonymous function.
+  (pfn&gt; name? [binder+] :- type? [[param :- type]* & [param :- type *]?] exprs*)
+  (pfn&gt; name? [binder+] (:- type? [[param :- type]* & [param :- type *]?] exprs*)+)&quot;</a>
+  [<a id='724' tid='723' class='u'>&</a> <a id='726' tid='725' class='u'>forms</a>]
+  (<a id='728' tid='727' class='u'>let</a> [<a id='730' tid='729' class='u'>{</a><a id='732' tid='731' class='u'>:keys</a> [<a id='734' tid='733' class='u'>poly</a> <a id='736' tid='735' class='u'>fn</a> <a id='738' tid='737' class='u'>parsed-methods</a>]<a id='740' tid='739' class='u'>}</a> (<a id='742' tid='741' class='u'>parse-fn&gt;</a> <a id='744' tid='743' class='u'>true</a> <a id='746' tid='745' class='u'>forms</a>)]
+    <a id='748' tid='747' class='u'>`</a>(<a id='750' tid='749' class='u'>pfn&gt;-ann</a> <a id='752' tid='751' class='u'>~fn</a> <a id='754' tid='753' class='u'>&#39;</a><a id='756' tid='755' class='u'>~poly</a> <a id='758' tid='757' class='u'>&#39;</a><a id='760' tid='759' class='u'>~parsed-methods</a>)))
+
+(<a id='498' tid='497' class='u'>defmacro</a> <a id='500' tid='499' class='u'>fn&gt;</a> 
+  <a id='502' tid='501' class='u'>&quot;Define a typed anonymous function.
+  (fn&gt; name? :- type? [[param :- type]* & [param :- type *]?] exprs*)
+  (fn&gt; name? (:- type? [[param :- type]* & [param :- type *]?] exprs*)+)&quot;</a>
+  [<a id='504' tid='503' class='u'>&</a> <a id='506' tid='505' class='u'>forms</a>]
+  (<a id='508' tid='507' class='u'>let</a> [<a id='510' tid='509' class='u'>{</a><a id='512' tid='511' class='u'>:keys</a> [<a id='514' tid='513' class='u'>fn</a> <a id='516' tid='515' class='u'>parsed-methods</a>]<a id='518' tid='517' class='u'>}</a> (<a id='520' tid='519' class='u'>parse-fn&gt;</a> <a id='522' tid='521' class='u'>false</a> <a id='524' tid='523' class='u'>forms</a>)]
+    <a id='526' tid='525' class='u'>`</a>(<a id='528' tid='527' class='u'>fn&gt;-ann</a> <a id='530' tid='529' class='u'>~fn</a> <a id='532' tid='531' class='u'>&#39;</a><a id='534' tid='533' class='u'>~parsed-methods</a>)))
+
+<span class='i'>(defmacro letfn&gt; 
+  &quot;Like letfn, but each binding must be annotated.
+
+  eg.
+  (letfn&gt; [a :- [Number -&gt; Number]
+           (a [b] 2)
+           c :- [Symbol -&gt; nil]
+           (c [s] nil)]
+    ...)&quot;
+  [bindings & body]
+  (let [; (Vector (U &#39;[Symbol TypeSyn] LetFnInit))
+        normalised-bindings
+        (loop [[fbnd :as bindings] bindings
+               norm []]
+          (cond
+            (empty? bindings) norm
+            (symbol? fbnd) (do
+                             (assert (#{:-} (second bindings))
+                                     &quot;letfn&gt; annotations require :- separator&quot;)
+                             (assert (&lt;= 3 (count bindings)))
+                             (recur 
+                               (drop 3 bindings)
+                               (conj norm [(nth bindings 0)
+                                           (nth bindings 2)])))
+            (list? fbnd) (recur
+                           (next bindings)
+                           (conj norm fbnd))
+            :else (throw (Exception. (str &quot;Unknown syntax to letfn&gt;: &quot; fbnd)))))
+        {anns false inits true} (group-by list? normalised-bindings)
+        ; init-syn unquotes local binding references to be compatible with hygienic expansion
+        init-syn (into {}
+                   (for [[lb type] anns]
+                     [lb `&#39;~type]))]
+    `(letfn ~(vec inits)
+       ;unquoted to allow bindings to resolve with hygiene
+       ~init-syn
+       ;preserve letfn empty body
+       nil
+       ~@body)))</span>
+
+
+(<a id='482' tid='481' class='u'>defmacro</a> <a id='484' tid='483' class='u'>defprotocol&gt;</a> [<a id='486' tid='485' class='u'>&</a> <a id='488' tid='487' class='u'>body</a>]
+  <span class='i'>&quot;Define a typed protocol. Syntax like defprotocol.&quot;</span>
+  <a id='490' tid='489' class='u'>`</a>(<a id='492' tid='491' class='u'>tc-ignore</a>
+     (<a id='494' tid='493' class='u'>defprotocol</a> <a id='496' tid='495' class='u'>~@body</a>)))
+
+(<a id='652' tid='651' class='u'>defmacro</a> <a id='654' tid='653' class='u'>loop&gt;</a>
+  <span class='i'>&quot;Like loop, except loop variables require annotation.
+
+  eg. (loop&gt; [a :- Number 1
+              b :- (U nil Number) nil]
+        ...)&quot;</span>
+  [<a id='656' tid='655' class='u'>bndings*</a> <a id='658' tid='657' class='u'>&</a> <a id='660' tid='659' class='u'>forms</a>]
+  (<a id='272' tid='271' class='m'>let</a> [<span class='i'>normalise-args</span>
+        <span class='i'>(fn [seq-exprs]
+          (loop [flat-result ()
+                 seq-exprs seq-exprs]
+            (cond
+              (empty? seq-exprs) flat-result
+              (and (vector? (first seq-exprs))
+                   (#{:-} (-&gt; seq-exprs first second))) (do
+                                                          (prn &quot;DEPRECATED WARNING: loop&gt; syntax has changed, use [b :- t i] for clauses&quot;
+                                                               &quot;ns: &quot; *ns* &quot; form:&quot; &form)
+                                                          (recur (concat flat-result (take 2 seq-exprs))
+                                                                 (drop 2 seq-exprs)))
+              :else (do (assert (#{:-} (second seq-exprs))
+                                &quot;Incorrect syntax in loop&gt;.&quot;)
+                        (recur (concat flat-result [(vec (take 3 seq-exprs))
+                                                    (nth seq-exprs 3)])
+                               (drop 4 seq-exprs))))))</span>
+        <span class='i'>;group args in flat pairs
+</span>        <span class='i'>bndings*</span> <span class='i'>(normalise-args bndings*)</span>
+        <span class='i'>bnds</span> <span class='i'>(partition 2 bndings*)</span>
+        <span class='i'>; [[lhs :- bnd-ann] rhs]
+</span>        <span class='i'>lhs</span> <span class='i'>(map ffirst bnds)</span>
+        <span class='i'>rhs</span> <span class='i'>(map second bnds)</span>
+        <span class='i'>bnd-anns</span> (<a id='274' tid='273' class='m'>map</a> <a id='276' tid='275' class='m'>#</a>(<a id='278' tid='277' class='m'>-&gt;</a> <a id='280' tid='279' class='m'>%</a> <a id='282' tid='281' class='m'>first</a> <a id='284' tid='283' class='m'>next</a> <a id='286' tid='285' class='m'>second</a>) <a id='288' tid='287' class='m'>bnds</a>)]
+    <a id='290' tid='289' class='m'>`</a>(<a id='292' tid='291' class='m'>loop&gt;-ann</a> (<a id='294' tid='293' class='m'>loop</a> <a id='296' tid='295' class='m'>~</a>(<a id='298' tid='297' class='m'>vec</a> (<a id='300' tid='299' class='m'>mapcat</a> <a id='302' tid='301' class='m'>vector</a> <a id='304' tid='303' class='m'>lhs</a> <a id='306' tid='305' class='m'>rhs</a>))
+                  <a id='308' tid='307' class='m'>~@forms</a>)
+                <a id='310' tid='309' class='m'>&#39;</a><a id='312' tid='311' class='m'>~bnd-anns</a>)))
+
+<span class='i'>(defn declare-datatypes* 
+  &quot;Internal use only. Use declare-datatypes.&quot;
+  [nms]
+  nil)</span>
+
+(<a id='442' tid='441' class='u'>defmacro</a> <a id='444' tid='443' class='u'>declare-datatypes</a> 
+  <a id='446' tid='445' class='u'>&quot;Declare datatypes, similar to declare but on the type level.&quot;</a>
+  [<a id='448' tid='447' class='u'>&</a> <a id='450' tid='449' class='u'>syms</a>]
+  <a id='452' tid='451' class='u'>`</a><span class='i'>(declare-datatypes* &#39;~syms)</span>)
+
+<span class='i'>(defn declare-protocols* 
+  &quot;Internal use only. Use declare-protocols.&quot;
+  [syms]
+  nil)</span>
+
+(<a id='466' tid='465' class='u'>defmacro</a> <a id='468' tid='467' class='u'>declare-protocols</a> 
+  <a id='470' tid='469' class='u'>&quot;Declare protocols, similar to declare but on the type level.&quot;</a>
+  [<a id='472' tid='471' class='u'>&</a> <a id='474' tid='473' class='u'>syms</a>]
+  <a id='476' tid='475' class='u'>`</a><span class='i'>(declare-protocols* &#39;~syms)</span>)
+
+<span class='i'>(defn declare-alias-kind* 
+  &quot;Internal use only. Use declare-alias-kind.&quot;
+  [sym ty]
+  nil)</span>
+
+(<a id='430' tid='429' class='u'>defmacro</a> <a id='432' tid='431' class='u'>declare-alias-kind</a>
+  <a id='434' tid='433' class='u'>&quot;Declare a kind for an alias, similar to declare but on the kind level.&quot;</a>
+  [<a id='436' tid='435' class='u'>sym</a> <a id='438' tid='437' class='u'>ty</a>]
+  <a id='440' tid='439' class='u'>`</a><span class='i'>(do
+     (declare ~sym)
+     (declare-alias-kind* &#39;~sym &#39;~ty))</span>)
+
+<span class='i'>(defn declare-names* 
+  &quot;Internal use only. Use declare-names.&quot;
+  [syms]
+  nil)</span>
+
+(<a id='454' tid='453' class='u'>defmacro</a> <a id='456' tid='455' class='u'>declare-names</a> 
+  <a id='458' tid='457' class='u'>&quot;Declare names, similar to declare but on the type level.&quot;</a>
+  [<a id='460' tid='459' class='u'>&</a> <a id='462' tid='461' class='u'>syms</a>]
+  <a id='464' tid='463' class='u'>`</a><span class='i'>(declare-names* &#39;~syms)</span>)
+
+<span class='i'>(defn def-alias* 
+  &quot;Internal use only. Use def-alias.&quot;
+  [sym type]
+  nil)</span>
+
+(<a id='478' tid='477' class='u'>defmacro</a> <a id='480' tid='479' class='u'>def-alias</a> 
+  <span class='i'>&quot;Define a type alias. Takes an optional doc-string as a second
+  argument.&quot;</span>
+  <span class='i'>([sym doc-str type]
+   (assert (string? doc-str) &quot;Doc-string passed to def-alias must be a string&quot;)
+   `(def-alias ~(vary-meta sym assoc :doc doc-str) ~type))</span>
+  <span class='i'>([sym type]
+   (assert (symbol? sym) (str &quot;First argument to def-alias must be a symbol: &quot; sym))
+   (let [qsym (if (namespace sym)
+                sym
+                (symbol (-&gt; *ns* ns-name str) (str sym)))
+         m (-&gt; (meta sym)
+             (update-in [:doc] #(str % &quot;\n\n&quot; (with-out-str (pprint/pprint type)))))]
+     `(do
+        (intern &#39;~(symbol (namespace qsym)) &#39;~(symbol (name qsym)))
+        (tc-ignore (alter-meta! (resolve &#39;~qsym) merge &#39;~m))
+        (def-alias* &#39;~qsym &#39;~type))))</span>)
+
+<span class='i'>;(ann into-array&gt;* [Any Any -&gt; Any])
+</span>(<a id='648' tid='647' class='u'>defn</a> <a id='650' tid='649' class='u'>into-array&gt;*</a>
+  <span class='i'>&quot;Internal use only. Use into-array&gt;.&quot;</span>
+  <span class='i'>([cljt coll]
+   (load-if-needed)
+   (let [pt @(ns-resolve (find-ns &#39;clojure.core.typed.parse-unparse)
+                         &#39;parse-type)
+         amc @(ns-resolve (find-ns &#39;clojure.core.typed.array-ops)
+                          &#39;Type-&gt;array-member-Class)]
+     (into-array (-&gt; cljt pt amc) coll)))</span>
+  <span class='i'>([javat cljt coll]
+   (load-if-needed)
+   (let [pt @(ns-resolve (find-ns &#39;clojure.core.typed.parse-unparse)
+                         &#39;parse-type)
+         amc @(ns-resolve (find-ns &#39;clojure.core.typed.array-ops)
+                          &#39;Type-&gt;array-member-Class)]
+     (into-array (-&gt; javat pt amc) coll)))</span>
+  <span class='i'>;this is the hacky case to prevent full core.typed from loading
+</span>  <span class='i'>([into-array-syn javat cljt coll]
+   (into-array (resolve into-array-syn) coll))</span>)
+
+<span class='i'>;FIXME hacky 4-arity version to prevent full type system from loading
+</span>(<a id='610' tid='609' class='u'>defmacro</a> <a id='612' tid='611' class='u'>into-array&gt;</a> 
+  <span class='i'>&quot;Make a Java array with Java class javat and Typed Clojure type
+  cljt. Resulting array will be of type javat, but elements of coll must be under
+  cljt. cljt should be a subtype of javat (the same or more specific).
+
+  *Temporary hack*
+  into-array-syn is exactly the syntax to put as the first argument to into-array.
+  Calling resolve on this syntax should give the correct class.&quot;</span>
+  ([<a id='614' tid='613' class='u'>cljt</a> <a id='616' tid='615' class='u'>coll</a>]
+   <a id='618' tid='617' class='u'>`</a>(<a id='620' tid='619' class='u'>into-array&gt;*</a> <a id='622' tid='621' class='u'>&#39;</a><a id='624' tid='623' class='u'>~cljt</a> <a id='626' tid='625' class='u'>~coll</a>))
+  ([<a id='628' tid='627' class='u'>javat</a> <a id='630' tid='629' class='u'>cljt</a> <a id='632' tid='631' class='u'>coll</a>]
+   <a id='634' tid='633' class='u'>`</a>(<a id='636' tid='635' class='u'>into-array&gt;*</a> <a id='638' tid='637' class='u'>&#39;</a><a id='640' tid='639' class='u'>~javat</a> <a id='642' tid='641' class='u'>&#39;</a><a id='644' tid='643' class='u'>~cljt</a> <a id='646' tid='645' class='u'>~coll</a>))
+  <span class='i'>([into-array-syn javat cljt coll]
+   `(into-array&gt;* &#39;~javat &#39;~cljt ~coll))</span>)
+
+(<a id='366' tid='365' class='u'>defn</a> <a id='368' tid='367' class='u'>ann-form*</a> 
+  <span class='i'>&quot;Internal use only. Use ann-form.&quot;</span>
+  [<a id='370' tid='369' class='u'>form</a> <a id='372' tid='371' class='u'>ty</a>]
+  <a id='374' tid='373' class='u'>form</a>)
+
+(<a id='348' tid='347' class='u'>defmacro</a> <a id='350' tid='349' class='u'>ann-form</a> 
+  <span class='i'>&quot;Annotate a form with an expected type.&quot;</span>
+  [<a id='352' tid='351' class='u'>form</a> <a id='354' tid='353' class='u'>ty</a>]
+  <a id='356' tid='355' class='u'>`</a>(<a id='358' tid='357' class='u'>ann-form*</a> <a id='360' tid='359' class='u'>~form</a> <a id='362' tid='361' class='u'>&#39;</a><a id='364' tid='363' class='u'>~ty</a>))
+
+<span class='i'>;(ann unsafe-ann-form* [Any Any -&gt; Any])
+</span><span class='i'>(defn- unsafe-ann-form* [form ty]
+  form)</span>
+
+<span class='i'>(defmacro ^:private unsafe-ann-form [form ty]
+  `(unsafe-ann-form* ~form &#39;~ty))</span>
+
+<span class='i'>;(ann tc-ignore-forms* [Any -&gt; Any])
+</span>(<a id='822' tid='821' class='u'>defn</a> <a id='824' tid='823' class='u'>tc-ignore-forms*</a> 
+  <span class='i'>&quot;Internal use only. Use tc-ignore&quot;</span>
+  [<a id='826' tid='825' class='u'>r</a>]
+  <a id='828' tid='827' class='u'>r</a>)
+
+<span class='i'>;; `do` is special at the top level
+</span>(<a id='792' tid='791' class='u'>defmacro</a> <a id='794' tid='793' class='u'>tc-ignore</a> 
+  <a id='796' tid='795' class='u'>&quot;Ignore forms in body during type checking&quot;</a>
+  [<a id='798' tid='797' class='u'>&</a> <a id='800' tid='799' class='u'>body</a>]
+  <a id='802' tid='801' class='u'>`</a>(<a id='804' tid='803' class='u'>do</a> <a id='806' tid='805' class='u'>~@</a>(<a id='808' tid='807' class='u'>map</a> (<a id='810' tid='809' class='u'>fn</a> [<a id='812' tid='811' class='u'>b</a>] <a id='814' tid='813' class='u'>`</a>(<a id='816' tid='815' class='u'>tc-ignore-forms*</a> <a id='818' tid='817' class='u'>~b</a>)) <a id='820' tid='819' class='u'>body</a>)))
+
+<span class='i'>(defn non-nil-return* 
+  &quot;Internal use only. Use non-nil-return.&quot;
+  [msym arities]
+  nil)</span>
+
+(<a id='688' tid='687' class='u'>defmacro</a> <a id='690' tid='689' class='u'>non-nil-return</a> 
+  <span class='i'>&quot;Override the return type of qualified method msym to be non-nil.
+  Takes a set of relevant arities,
+  represented by the number of parameters it takes (rest parameter counts as one),
+  or :all which overrides all arities.
+  
+  eg.  (non-nil-return java.lang.Class/getDeclaredMethod :all)&quot;</span>
+  [<a id='692' tid='691' class='u'>msym</a> <a id='694' tid='693' class='u'>arities</a>]
+  <a id='696' tid='695' class='u'>`</a><span class='i'>(non-nil-return* &#39;~msym &#39;~arities)</span>)
+
+<span class='i'>(defn nilable-param* 
+  &quot;Internal use only. Use nilable-param.&quot;
+  [msym mmap]
+  nil)</span>
+
+(<a id='678' tid='677' class='u'>defmacro</a> <a id='680' tid='679' class='u'>nilable-param</a> 
+  <span class='i'>&quot;Override which parameters in qualified method msym may accept
+  nilable values. If the parameter is a parameterised type or
+  an Array, this also declares the parameterised types and the Array type as nilable.
+
+  mmap is a map mapping arity parameter number to a set of parameter
+  positions (integers). If the map contains the key :all then this overrides
+  other entries. The key can also be :all, which declares all parameters nilable.&quot;</span>
+  [<a id='682' tid='681' class='u'>msym</a> <a id='684' tid='683' class='u'>mmap</a>]
+  <a id='686' tid='685' class='u'>`</a><span class='i'>(nilable-param* &#39;~msym &#39;~mmap)</span>)
+
+<span class='i'>;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+</span><span class='i'>;; Annotations
+</span>
+(<a id='774' tid='773' class='u'>defn</a> <a id='776' tid='775' class='u'>print-env</a> 
+  <span class='i'>&quot;During type checking, print the type environment to *out*,
+  preceeded by literal string debug-str.&quot;</span>
+  [<a id='778' tid='777' class='u'>debug-str</a>]
+  <a id='780' tid='779' class='u'>nil</a>)
+
+<span class='i'>(defn ann* 
+  &quot;Internal use only. Use ann.&quot;
+  [varsym typesyn check?]
+  nil)</span>
+
+(<a id='314' tid='313' class='u'>defmacro</a> <a id='316' tid='315' class='u'>ann</a> 
+  <span class='i'>&quot;Annotate varsym with type. If unqualified, qualify in the current namespace.
+  If varsym has metadata {:nocheck true}, ignore definitions of varsym while type checking.&quot;</span>
+  [<a id='318' tid='317' class='u'>varsym</a> <a id='320' tid='319' class='u'>typesyn</a>]
+  <span class='i'>(let [qsym (if (namespace varsym)
+               varsym
+               (symbol (-&gt; *ns* ns-name str) (str varsym)))]
+    `(ann* &#39;~qsym &#39;~typesyn &#39;~(-&gt; varsym meta :nocheck not)))</span>)
+
+<span class='i'>(defn ann-datatype*
+  &quot;Internal use only. Use ann-datatype.&quot;
+  [dname fields opts]
+  nil)</span>
+
+(<a id='322' tid='321' class='u'>defmacro</a> <a id='324' tid='323' class='u'>ann-datatype</a> 
+  <span class='i'>&quot;Annotate datatype Class name dname with expected fields.
+  If unqualified, qualify in the current namespace.&quot;</span>
+  <span class='i'>[dname fields & {ancests :unchecked-ancestors rplc :replace :as opts}]</span>
+  (<a id='326' tid='325' class='u'>assert</a> (<a id='328' tid='327' class='u'>not</a> <a id='330' tid='329' class='u'>rplc</a>) <a id='332' tid='331' class='u'>&quot;Replace NYI&quot;</a>)
+  (<a id='334' tid='333' class='u'>assert</a> (<a id='336' tid='335' class='u'>symbol?</a> <a id='338' tid='337' class='u'>dname</a>)
+          (<a id='340' tid='339' class='u'>str</a> <a id='342' tid='341' class='u'>&quot;Must provide name symbol: &quot;</a> <a id='344' tid='343' class='u'>dname</a>))
+  <a id='346' tid='345' class='u'>`</a><span class='i'>(ann-datatype* &#39;~dname &#39;~fields &#39;~opts)</span>)
+
+<span class='i'>(defn ann-pdatatype* 
+  &quot;Internal use only. Use ann-pdatatype.&quot;
+  [dname vbnd fields opt]
+  nil)</span>
+
+(<a id='376' tid='375' class='u'>defmacro</a> <a id='378' tid='377' class='u'>ann-pdatatype</a> 
+  <span class='i'>&quot;Annotate datatype Class name dname with a polymorphic binder and expected fields.
+  If unqualified, qualify in the current namespace.&quot;</span>
+  <span class='i'>[dname vbnd fields & {ancests :unchecked-ancestors rplc :replace :as opt}]</span>
+  (<a id='380' tid='379' class='u'>assert</a> (<a id='382' tid='381' class='u'>not</a> <a id='384' tid='383' class='u'>rplc</a>) <a id='386' tid='385' class='u'>&quot;Replace NYI&quot;</a>)
+  (<a id='388' tid='387' class='u'>assert</a> (<a id='390' tid='389' class='u'>symbol?</a> <a id='392' tid='391' class='u'>dname</a>)
+          (<a id='394' tid='393' class='u'>str</a> <a id='396' tid='395' class='u'>&quot;Must provide local symbol: &quot;</a> <a id='398' tid='397' class='u'>dname</a>))
+  <a id='400' tid='399' class='u'>`</a><span class='i'>(ann-pdatatype* &#39;~dname &#39;~vbnd &#39;~fields &#39;~opt)</span>)
+
+<span class='i'>(defn ann-record* 
+  &quot;Internal use only. Use ann-record&quot;
+  [dname fields opt]
+  nil)</span>
+
+<span class='i'>(defmacro ann-record 
+  &quot;Annotate record Class name dname with expected fields.
+  If unqualified, qualify in the current namespace.&quot;
+  [dname fields & {ancests :unchecked-ancestors rplc :replace :as opt}]
+  `(ann-record* &#39;~dname &#39;~fields &#39;~opt))</span>
+
+<span class='i'>(defn ann-precord* 
+  &quot;Internal use only. Use ann-precord.&quot;
+  [dname vbnd fields opt]
+  nil)</span>
+
+<span class='i'>(defmacro ann-precord 
+  &quot;Annotate record Class name dname with a polymorphic binder and expected fields.
+  If unqualified, qualify in the current namespace.&quot;
+  [dname vbnd fields & {ancests :unchecked-ancestors rplc :replace :as opt}]
+  `(ann-precord* &#39;~dname &#39;~vbnd &#39;~fields &#39;~opt))</span>
+
+<span class='i'>(defn ann-protocol* 
+  &quot;Internal use only. Use ann-protocol.&quot;
+  [varsym mth]
+  nil)</span>
+
+(<a id='408' tid='407' class='u'>defmacro</a> <a id='410' tid='409' class='u'>ann-protocol</a> 
+  <span class='i'>&quot;Annotate protocol var with method types.
+  
+  eg. (ann-protocol IFoo
+        bar
+        [IFoo -&gt; Any]
+        baz
+        [IFoo -&gt; Number])&quot;</span>
+  <span class='i'>[varsym & {:as mth}]</span>
+  <a id='412' tid='411' class='u'>`</a><span class='i'>(ann-protocol* &#39;~varsym &#39;~mth)</span>)
+
+<span class='i'>(defn ann-pprotocol* 
+  &quot;Internal use only. Use ann-pprotocol.&quot;
+  [varsym vbnd mth]
+  nil)</span>
+
+(<a id='402' tid='401' class='u'>defmacro</a> <a id='404' tid='403' class='u'>ann-pprotocol</a> 
+  <span class='i'>&quot;Annotate polymorphic protocol with a polymorphic binder and method types.&quot;</span>
+  <span class='i'>[varsym vbnd & {:as mth}]</span>
+  <a id='406' tid='405' class='u'>`</a><span class='i'>(ann-pprotocol* &#39;~varsym &#39;~vbnd &#39;~mth)</span>)
+
+<span class='i'>(defn override-constructor* 
+  &quot;Internal use only. Use override-constructor.&quot;
+  [ctorsym typesyn]
+  nil)</span>
+
+(<a id='698' tid='697' class='u'>defmacro</a> <a id='700' tid='699' class='u'>override-constructor</a> 
+  <span class='i'>&quot;Override all constructors for Class ctorsym with type.&quot;</span>
+  [<a id='702' tid='701' class='u'>ctorsym</a> <a id='704' tid='703' class='u'>typesyn</a>]
+  <a id='706' tid='705' class='u'>`</a><span class='i'>(override-constructor* &#39;~ctorsym &#39;~typesyn)</span>)
+
+<span class='i'>(defn override-method* 
+  &quot;Internal use only. Use override-method.&quot;
+  [methodsym typesyn]
+  nil)</span>
+
+(<a id='708' tid='707' class='u'>defmacro</a> <a id='710' tid='709' class='u'>override-method</a> 
+  <span class='i'>&quot;Override type for qualified method methodsym.&quot;</span>
+  [<a id='712' tid='711' class='u'>methodsym</a> <a id='714' tid='713' class='u'>typesyn</a>]
+  <a id='716' tid='715' class='u'>`</a><span class='i'>(override-method* &#39;~methodsym &#39;~typesyn)</span>)
+
+<span class='i'>(defn typed-deps* 
+  &quot;Internal use only. Use typed-deps.&quot;
+  [args]
+  nil)</span>
+
+<span class='i'>(defmacro typed-deps 
+  &quot;Declare namespaces which should be checked before the current namespace.
+  Accepts any number of symbols.&quot;
+  [& args]
+  `(typed-deps* &#39;~args))</span>
+
+
+<span class='i'>; cf can pollute current type environment to allow REPL experimentation, 
+</span><span class='i'>; which is ok because check-ns resets it when called.
+</span>(<a id='414' tid='413' class='u'>defmacro</a> <a id='416' tid='415' class='u'>cf</a>
+  <a id='418' tid='417' class='u'>&quot;Type check a Clojure form and return its type&quot;</a>
+  <span class='i'>([form]
+   `(do
+      (load-if-needed)
+      (let [check# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.check)
+                                &#39;~&#39;check)
+            expr-type# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.check)
+                                    &#39;~&#39;expr-type )
+            unparse-TCResult-in-ns# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.parse-unparse)
+                                           &#39;~&#39;unparse-TCResult-in-ns)
+            ensure-clojure# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.current-impl)
+                                         &#39;~&#39;ensure-clojure)
+            ast-for-form# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.analyze-clj)
+                                       &#39;~&#39;ast-for-form)
+            collect# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.collect-phase)
+                                  &#39;~&#39;collect)]
+        (if *currently-checking-clj*
+          (throw (Exception. &quot;Found inner call to check-ns or cf&quot;))
+          (do (ensure-clojure#)
+              (binding [*currently-checking-clj* true
+                        *delayed-errors* (-init-delayed-errors)]
+                (let [ast# (ast-for-form# &#39;~form)
+                      _# (collect# ast#)
+                      cexpr# (check# ast#)]
+                  (if-let [errors# (seq @*delayed-errors*)]
+                    (print-errors! errors#)
+                    (-&gt; cexpr#
+                        expr-type#
+                        (unparse-TCResult-in-ns# *ns*))))))))))</span>
+   <span class='i'>([form expected]
+   `(do
+      (load-if-needed)
+      (let [check# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.check)
+                                &#39;~&#39;check)
+            expr-type# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.check)
+                                    &#39;~&#39;expr-type )
+            unparse-TCResult-in-ns# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.parse-unparse)
+                                                 &#39;~&#39;unparse-TCResult-in-ns)
+            ensure-clojure# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.current-impl)
+                                         &#39;~&#39;ensure-clojure)
+            ast-for-form# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.analyze-clj)
+                                       &#39;~&#39;ast-for-form)
+            collect# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.collect-phase)
+                                  &#39;~&#39;collect)
+            ret# @(ns-resolve (find-ns &#39;~&#39;clojure.core.typed.type-rep)
+                              &#39;~&#39;ret)
+            parse-type# @(ns-resolve (find-ns &#39;clojure.core.typed.parse-unparse)
+                                     &#39;~&#39;parse-type)]
+      (if *currently-checking-clj*
+        (throw (Exception. &quot;Found inner call to check-ns or cf&quot;))
+        (do (ensure-clojure#)
+            (binding [*currently-checking-clj* true
+                      *delayed-errors* (-init-delayed-errors)]
+              (let [ast# (ast-for-form# &#39;(ann-form ~form ~expected))
+                    _# (collect# ast#)
+                    c-ast# (check# ast# 
+                                   (ret#
+                                     (parse-type# &#39;~expected)))]
+                (if-let [errors# (seq @*delayed-errors*)]
+                  (print-errors! errors#)
+                  (-&gt; c-ast# 
+                      expr-type# 
+                      (unparse-TCResult-in-ns# *ns*))))))))))</span>)
+
+<span class='i'>(declare ^:dynamic *verbose-forms*)</span>
+
+<span class='i'>(defn print-errors! [errors]
+  {:pre [(seq errors)
+         (every? #(instance? clojure.lang.ExceptionInfo %) errors)]}
+  (binding [*out* *err*]
+    (doseq [^Exception e errors]
+      (let [{:keys [env] :as data} (ex-data e)]
+        (print &quot;Type Error &quot;)
+        (print (str &quot;(&quot; (-&gt; env :ns :name) &quot;:&quot; (:line env) 
+                    (when-let [col (:column env)]
+                      (str &quot;:&quot;col))
+                    &quot;) &quot;))
+        (print (.getMessage e))
+        (println)
+        (flush)
+        (let [[_ form :as has-form?] (find data :form)]
+          (when has-form?
+            (binding [*print-length* (when-not *verbose-forms*
+                                       4)
+                      *print-level* (when-not *verbose-forms*
+                                      2)]
+              (print &quot;in: &quot;)
+              (println form)
+              (println)
+              (println)
+              (flush))))
+        (flush))))
+  (throw (ex-info (str &quot;Type Checker: Found &quot; (count errors) &quot; errors&quot;)
+                  {:type-error :top-level-error
+                   :errors errors})))</span>
+
+<span class='i'>(def ^:dynamic *already-collected*)</span>
+<span class='i'>(def ^:dynamic *already-checked*)</span>
+<span class='i'>(def ^:dynamic *currently-checking-clj* nil)</span>
+<span class='i'>(def ^:dynamic *delayed-errors*)</span>
+
+<span class='i'>(def ^:dynamic *verbose-types* 
+  &quot;If true, print fully qualified types in error messages
+  and return values.&quot;
+  nil)</span>
+<span class='i'>(def ^:dynamic *verbose-forms* 
+  &quot;If true, print complete forms in error messages.&quot;
+  nil)</span>
+
+<span class='i'>(defn -init-delayed-errors 
+  &quot;Internal use only&quot;
+  []
+  (atom [] :validator #(and (vector? %)
+                            (every? (fn [a] 
+                                      (instance? clojure.lang.ExceptionInfo a))
+                                    %))))</span>
+
+(<a id='420' tid='419' class='u'>defn</a> <a id='422' tid='421' class='u'>check-ns</a>
+  <span class='i'>&quot;Type check a namespace. If not provided default to current namespace.
+  
+  Bind *verbose-types* to true to print fully qualified types.
+  Bind *verbose-forms* to print full forms in error messages.&quot;</span>
+  ([] (<a id='424' tid='423' class='u'>check-ns</a> (<a id='426' tid='425' class='u'>ns-name</a> <a id='428' tid='427' class='u'>*ns*</a>)))
+  <span class='i'>([nsym]
+   (load-if-needed)
+   (let [reset-envs! @(ns-resolve (find-ns &#39;clojure.core.typed.init)
+                                  &#39;reset-envs!)
+         ensure-clojure @(ns-resolve (find-ns &#39;clojure.core.typed.current-impl)
+                                     &#39;ensure-clojure)
+         collect-ns @(ns-resolve (find-ns &#39;clojure.core.typed.collect-phase)
+                                 &#39;collect-ns)
+         check-ns-and-deps @(ns-resolve (find-ns &#39;clojure.core.typed.check)
+                                        &#39;check-ns-and-deps)
+         vars-with-unchecked-defs @(ns-resolve (find-ns &#39;clojure.core.typed.var-env)
+                                               &#39;vars-with-unchecked-defs)]
+   (reset-envs!)
+   (cond
+     *currently-checking-clj* (throw (Exception. &quot;Found inner call to check-ns or cf&quot;))
+
+     :else
+     (binding [*currently-checking-clj* true
+               *delayed-errors* (-init-delayed-errors)
+               *already-collected* (atom #{})
+               *already-checked* (atom #{})]
+       (ensure-clojure)
+       (collect-ns nsym)
+       (check-ns-and-deps nsym)
+       (let [vs (vars-with-unchecked-defs)]
+         (binding [*out* *err*]
+           (doseq [v vs]
+             (println &quot;WARNING: Type Checker: Definition missing:&quot; v)
+             (flush))))
+       (when-let [errors (seq @*delayed-errors*)]
+         (print-errors! errors))
+       :ok))))</span>)
+
+<span class='i'>(comment 
+  (check-ns &#39;clojure.core.typed.test.example)
+
+  ; very slow because of update-composite
+  (check-ns &#39;clojure.core.typed.test.rbt)
+
+  (check-ns &#39;clojure.core.typed.test.macro)
+  (check-ns &#39;clojure.core.typed.test.conduit)
+  (check-ns &#39;clojure.core.typed.test.person)
+  (check-ns &#39;clojure.core.typed.test.core-logic)
+  (check-ns &#39;clojure.core.typed.test.ckanren)
+  )</span>
+
+</pre>
+</div>
+</body>
+</html>

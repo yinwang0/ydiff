@@ -19,7 +19,7 @@ To build ydiff, go to the directory containing the source and run
 
     make
 
-It should compile to several executables, such as `diff-scheme`,
+It should compile to several executables, such as `diff-lisp`,
 `diff-cpp`, `diff-js` etc. Copy those files to some directory in your
 PATH.
 
@@ -29,7 +29,7 @@ PATH.
 
 1. Run commands like this example:
 
-        diff-scheme demos/mk1.ss demos/mk2.ss
+        diff-lisp demos/mk1.ss demos/mk2.ss
 
    It will produce a HTML file named "mk1-mk2.html" in the current
    directory.
