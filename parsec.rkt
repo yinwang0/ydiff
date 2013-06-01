@@ -192,7 +192,7 @@
          [(= start (string-length s)) (values 'eof start)]
 
          [(start-with-one-of s start *significant-whitespaces*)
-          (values (Node 'newline start (add1 start) '()) 
+          (values (Node 'newline start (add1 start) '() #f)
                   (add1 start))]
 
          [(whitespace? (string-ref s start))
@@ -205,7 +205,8 @@
             (values (Node 'comment
                           start
                           (add1 line-end)
-                          (substring s start line-end))
+                          (substring s start line-end)
+                          #f)
                     line-end))]
 
          [(start-with s start *comment-start*) ; block comment
@@ -213,22 +214,23 @@
                                       (lambda (s start)
                                         (start-with s start *comment-end*)))]
                  [end (+ line-end (string-length *comment-end*))])
-            (values (Node 'comment 
+            (values (Node 'comment
                           start
                           end
-                          (substring s start end)) 
+                          (substring s start end)
+                          #f)
                     end))]
 
          [(find-delim s start) =>
           (lambda (delim)
             (let ([end (+ start (string-length delim))])
-              (values (Node 'token start end delim)
+              (values (Node 'token start end delim #f)
                       end)))]
 
          [(find-operator s start) =>
           (lambda (op)
             (let ([end (+ start (string-length op))])
-              (values (Node 'token start end op)
+              (values (Node 'token start end op #f)
                       end)))]
 
          [(start-with-one-of s start *quotation-marks*)   ; string
@@ -242,7 +244,7 @@
              [else
               (let* ([len (string-length (car reg-match))]
                      [end (+ start len)])
-                (values (Node 'str start end (car reg-match)) 
+                (values (Node 'str start end (car reg-match) #f)
                         end))]))]
 
          [(start-with-one-of s start *lisp-char*)         ; scheme/elisp char
@@ -257,7 +259,7 @@
                            (delim? (string-ref s end)))
                        end]
                       [else (loop (add1 end))]))])
-              (values (Node 'char start end (string-ref s (sub1 end)))
+              (values (Node 'char start end (string-ref s (sub1 end)) #f)
                       end))])]
 
          [else                        ; identifier or number
@@ -268,7 +270,7 @@
                   (find-delim s pos)
                   (find-operator s pos))
               (let ([text (list->string (reverse chars))])
-                (values (Node 'token start pos text) 
+                (values (Node 'token start pos text #f)
                         pos))]
              [else
               (loop (add1 pos) (cons (string-ref s pos) chars))]))])))
@@ -414,16 +416,18 @@
              [(not type)
               (values (filter (negate phantom?) t) r)]
              [(null? t)
-              (values (list (Node type 
+              (values (list (Node type
                                   (Node-start (car toks))
                                   (Node-start (car toks))
-                                  '()))
+                                  '()
+                                  #f))
                       r)]
              [else
-              (values (list (Node type 
+              (values (list (Node type
                                   (Node-start (car t))
                                   (Node-end (last t))
-                                  (filter (negate phantom?) t)))
+                                  (filter (negate phantom?) t)
+                                  #f))
                       r)])))))))
 
 
@@ -583,7 +587,8 @@
                 (values (list (Node 'phantom
                                     (Node-start (car t))
                                     (Node-end (last t))
-                                    '()))
+                                    '()
+                                    #f))
                         r)])])))))))
 
 
@@ -671,10 +676,11 @@
          (cond
           [(null? fields) ret]
           [else
-           (let ([e (Node type 
+           (let ([e (Node type
                           (Node-start ret)
                           (Node-end (cadr fields))
-                          (list ret (car fields) (cadr fields)))])
+                          (list ret (car fields) (cadr fields))
+                          #f)])
              (loop (cddr fields) e))]))))
 
 
@@ -689,7 +695,8 @@
              (let ([e (Node type
                             (Node-start (cadr fields))
                             (Node-end ret)
-                            (list (cadr fields) (car fields) ret))])
+                            (list (cadr fields) (car fields) ret)
+                            #f)])
                (loop (cddr fields) e))])))))
 
 
@@ -774,7 +781,8 @@
            (let ([e (Node type
                           (Node-start ret)
                           (Node-end (car ls))
-                          (list ret (car ls)))])
+                          (list ret (car ls))
+                          #f)])
              (loop (cdr ls) e))]))))
 
 
@@ -799,7 +807,8 @@
         (Node type
               (Node-start (car ls))
               (Node-end tail)
-              (list (car ls) tail)))])))
+              (list (car ls) tail)
+              #f))])))
 
 
 ;; ($eval (@prefix 'prefix $primary-expression $prefix-operator)
@@ -912,4 +921,3 @@
     (letv ([(t r) ($eval p (filter (lambda (x) (not (comment? x)))
                                    (scan s)))])
       t)))
-

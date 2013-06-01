@@ -20,7 +20,7 @@
 (define get-keyword
   (lambda (node)
     (match node
-      [(Node type _ _ elts)
+      [(Node type _ _ elts _)
        (cond
         [(not (pair? elts)) #f]
         [(null? elts) #f]

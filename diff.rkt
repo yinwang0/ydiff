@@ -125,7 +125,7 @@
 (define deframe
   (lambda (node)
     (match node
-      [(Node 'frame _ _ elts)
+      [(Node 'frame _ _ elts _)
        (apply append (map deframe elts))]
      [else (list node)])))
 
@@ -145,11 +145,11 @@
 (define extract-frame
   (lambda (node1 node2 type)
     (match node1
-      [(Node type1 start1 end1 elts1)
+      [(Node type1 start1 end1 elts1 size)
        (let ([frame-elts (filter (lambda (x)
                                    (not (eq? x node2)))
                                  elts1)])
-         (type (Node 'frame start1 start1 frame-elts)))]
+         (type (Node 'frame start1 start1 frame-elts (- size (Node-size node2)))))]
       [_ fatal 'extract-frame "I only accept Node"])))
 
 
@@ -202,26 +202,20 @@
 
 
 ;----------- node size function ------------
-(define *node-size-hash* (make-hasheq))
-
 (define node-size
   (lambda (node)
-    (define memo
-      (lambda (v)
-        (if (> v 1)
-            (hash-set! *node-size-hash* node v)
-            (void))
-        v))
     (cond
      [(pair? node)
       (apply + (map node-size node))]
      [(or (token? node) (str? node) (character? node)) 1]
      [(Node? node)
       (cond
-       [(hash-has-key? *node-size-hash* node)
-        (hash-ref *node-size-hash* node)]
+       [(Node-size node)
+        (Node-size node)]
        [else
-        (memo (node-size (Node-elts node)))])]
+        (let ([size (node-size (Node-elts node))])
+          (set-Node-size! node size)
+          size)])]
      [else 0])))
 
 
@@ -558,7 +552,7 @@
 
 
 ;; iterate diff-list on the list of changes
-(define closure
+(define find-moves
   (lambda (changes)
     (set! *diff-hash* (make-hasheq))
     (let loop ([changes changes] [closed '()] [count 1])
@@ -773,7 +767,6 @@
 
 (define cleanup
   (lambda ()
-    (set! *node-size-hash* (make-hasheq))
     (set! *diff-hash* (make-hasheq))))
 
 
@@ -785,7 +778,7 @@
     (letv ([start (current-seconds)]
            [(changes _) (diff-node node1 node2 #f)]
            [_ (diff-progress "\nDone diffing")]
-           [changes (closure changes)]
+           [changes (find-moves changes)]
            [_ (diff-progress "\nDone moving")]
            [end (current-seconds)])
       (printf "finished in ~a seconds~n" (- end start))

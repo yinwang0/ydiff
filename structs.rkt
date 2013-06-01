@@ -6,7 +6,7 @@
 ;-------------------------------------------------------------
 ;                       data types
 ;-------------------------------------------------------------
-(struct Node (type start end elts) #:transparent)
+(struct Node (type start end elts [size #:mutable]) #:transparent)
 
 
 (define comment?
@@ -39,8 +39,8 @@
 (define decode-ast
   (lambda (exp)
     (match exp
-      [`(Node ',type ,start ,end ,elts)
-       (Node start end type (decode-ast elts))]
+      [`(Node ',type ,start ,end ,elts ,size)
+       (Node start end type (decode-ast elts) size)]
       [`(list ,elts ...)
        (map decode-ast elts)]
       [''() '()])))
