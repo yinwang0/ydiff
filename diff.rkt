@@ -203,21 +203,17 @@
 
 ;----------- node size function ------------
 (define node-size
-  (lambda (obj)
+  (lambda (node)
     (cond
-     [(and (Node? obj) (Node-size obj))
-      (Node-size obj)]
-     [(pair? obj)
-      (apply + (map node-size obj))]
-     [(or (token? obj) (str? obj) (character? obj)) 1]
-     [(Node? obj)
-      (cond
-       [(Node-size obj)
-        (Node-size obj)]
-       [else
-        (let ([size (node-size (Node-elts obj))])
-          (set-Node-size! obj size)
-          size)])]
+     [(and (Node? node) (Node-size node))
+      (Node-size node)]
+     [(pair? node)
+      (apply + (map node-size node))]
+     [(or (token? node) (str? node) (character? node)) 1]
+     [(Node? node)
+      (let ([size (node-size (Node-elts node))])
+        (set-Node-size! node size)
+        size)]
      [else 0])))
 
 
