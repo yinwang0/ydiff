@@ -203,18 +203,20 @@
 
 ;----------- node size function ------------
 (define node-size
-  (lambda (node)
+  (lambda (obj)
     (cond
-     [(pair? node)
-      (apply + (map node-size node))]
-     [(or (token? node) (str? node) (character? node)) 1]
-     [(Node? node)
+     [(and (Node? obj) (Node-size obj))
+      (Node-size obj)]
+     [(pair? obj)
+      (apply + (map node-size obj))]
+     [(or (token? obj) (str? obj) (character? obj)) 1]
+     [(Node? obj)
       (cond
-       [(Node-size node)
-        (Node-size node)]
+       [(Node-size obj)
+        (Node-size obj)]
        [else
-        (let ([size (node-size (Node-elts node))])
-          (set-Node-size! node size)
+        (let ([size (node-size (Node-elts obj))])
+          (set-Node-size! obj size)
           size)])]
      [else 0])))
 
@@ -775,6 +777,10 @@
 ;; returns all changes after diffing and moving
 (define diff
   (lambda (node1 node2)
+    (letv ([size1 (node-size node1)]
+           [size2 (node-size node2)])
+      (printf "size of program 1: ~a~n" size1)
+      (printf "size of program 2: ~a~n" size2))
     (letv ([start (current-seconds)]
            [(changes _) (diff-node node1 node2 #f)]
            [_ (diff-progress "\nDone diffing")]
