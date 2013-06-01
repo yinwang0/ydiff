@@ -33,9 +33,12 @@
 
 (set-get-name
   (lambda (node)
-    (let ([id-exp (match-tags node '(name identifier id))])
-      (and id-exp (get-symbol (car (Node-elts id-exp)))))))
-
+    (let ([name (match-tags node '(name))])
+      (cond
+       [(not name) #f]
+       [(pair? (Node-elts name))
+        (get-symbol (car (Node-elts name)))]
+       [else #f]))))
 
 ;; (same-def? (car (parse1 $statement "function f(x) {}"))
 ;;            (car (parse1 $statement "function f(x) {}")))
