@@ -244,7 +244,6 @@
       (map (lambda (n) (set-node-context n ctx)) node)]
      [(Node? node)
       (let ([name (or (get-name node) ctx)])
-        (if name (printf "got name: ~a~n" name) (void))
         (set-Node-ctx! node name)
         (set-node-context (Node-elts node) name))])))
 
