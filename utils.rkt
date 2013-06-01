@@ -1,5 +1,5 @@
 ;; ydiff - a language-aware tool for comparing programs
-;; Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
+;; Copyright (C) 2011-2013 Yin Wang (yinwang0@gmail.com)
 
 
 ;; This program is free software: you can redistribute it and/or modify
@@ -113,19 +113,24 @@
 
 (define new-progress
   (lambda (size)
-    (let ([counter 0])
+    (let ([counter 0]
+          [dots 0])
       (lambda (x)
         (cond
-         [(string? x)
-          (display x)
-          (display "\n")
-          (flush-output)]
+         [(eq? x 'reset)
+          (set! counter 0)
+          (set! dots 0)]
          [(= 0 (remainder counter size))
           (set! counter (+ x counter))
           (display ".")
+          (set! dots (+ dots 1))
+          (if (= 0 (modulo dots 60))
+              (display "\n")
+              (void))
           (flush-output)]
          [else
           (set! counter (+ x counter))])))))
+
 
 
 ;;----------------- multi dimensional eq hash --------------------
