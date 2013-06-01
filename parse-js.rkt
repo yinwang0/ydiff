@@ -697,4 +697,4 @@
 ;                          tests
 ;-------------------------------------------------------------
 
-;; (parse-js (read-file "nav-div.js"))
+;; (parse-js (read-file "demos/nav1.js"))

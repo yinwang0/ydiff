@@ -20,15 +20,14 @@
 (define get-keyword
   (lambda (node)
     (match node
-      [(Node type _ _ elts _)
+      [(Node type _ _ elts _ _)
        (cond
-        [(not (pair? elts)) #f]
-        [(null? elts) #f]
-        [else
+        [(pair? elts)
          (let ([sym (get-symbol (car elts))])
            (cond
             [(memq sym *keywords*) sym]
-            [else #f]))])]
+            [else #f]))]
+        [else #f])]
       [_ #f])))
 
 

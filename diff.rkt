@@ -33,6 +33,12 @@
 (define *move-size* 5)
 
 
+;; Similar to *move-size*, but this number is used for internal moves inside a
+;; named body (for example a function). This number can be smaller than
+;; *move-size*, usually set to 2 for maxmum accuracy without much noise.
+(define *inner-move-size* 2)
+
+
 ;; How long must a string be in order for us to use string-dist
 ;; function, which is costly when used on long strings but the most
 ;; accurate method to use. Currently this parameter is set to 0,
@@ -125,7 +131,7 @@
 (define deframe
   (lambda (node)
     (match node
-      [(Node 'frame _ _ elts _)
+      [(Node 'frame _ _ elts _ _)
        (apply append (map deframe elts))]
      [else (list node)])))
 
@@ -145,11 +151,11 @@
 (define extract-frame
   (lambda (node1 node2 type)
     (match node1
-      [(Node type1 start1 end1 elts1 size)
+      [(Node type1 start1 end1 elts1 size ctx)
        (let ([frame-elts (filter (lambda (x)
                                    (not (eq? x node2)))
                                  elts1)])
-         (type (Node 'frame start1 start1 frame-elts (- size (Node-size node2)))))]
+         (type (Node 'frame start1 start1 frame-elts (- size (node-size node2)) ctx)))]
       [_ fatal 'extract-frame "I only accept Node"])))
 
 
@@ -229,6 +235,19 @@
 
 
 ; (node-depth (parse-scheme "(lambda (x (x (y)) (y)) x)"))
+
+
+(define set-node-context
+  (lambda (node ctx)
+    (cond
+     [(pair? node)
+      (map (lambda (n) (set-node-context n ctx)) node)]
+     [(Node? node)
+      (let ([name (or (get-name node) ctx)])
+        (if name (printf "got name: ~a~n" name) (void))
+        (set-Node-ctx! node name)
+        (set-node-context (Node-elts node) name))])))
+
 
 
 (define uid
@@ -471,42 +490,58 @@
 
 
 
+(define same-ctx?
+  (lambda (x y)
+    (and (Node? x)
+         (Node? y)
+         (Node-ctx x)
+         (Node-ctx y)
+         (>= (node-size x) *inner-move-size*)
+         (>= (node-size y) *inner-move-size*)
+         (eq? (Node-ctx x) (Node-ctx y)))))
+
 
 ;; structure extraction
 (define diff-extract
   (lambda (node1 node2 move?)
     (cond
-     [(or (< (node-size node1) *move-size*)
-          (< (node-size node2) *move-size*))
-      (values #f #f)]
-     [(and (Node? node1) (Node? node2))
+     [(and (Node? node1) (Node? node2)
+           (or (same-ctx? node1 node2)
+               (and (>= (node-size node1) *move-size*)
+                    (>= (node-size node2) *move-size*))))
       (cond
        [(<= (node-size node1) (node-size node2))
         (let loop ([elts2 (Node-elts node2)])
           (cond
-           [(null? elts2) (values #f #f)]
-           [else
-            (letv ([(m0 c0) (diff-node node1 (car elts2)  move?)])
+           [(pair? elts2)
+            (letv ([(m0 c0) (diff-node node1 (car elts2) move?)])
               (cond
                [(or (same-def? node1 (car elts2))
-                    (zero? c0))
+                    (and (zero? c0)
+                         (or (> (node-size node1) *move-size*)
+                             (same-ctx? node1 (car elts2)))))
                 (let ([frame (extract-frame node2 (car elts2) ins)])
                   (values (append m0 frame) c0))]
                [else
-                (loop (cdr elts2))]))]))]
+                (loop (cdr elts2))]))]
+           [else
+            (values #f #f)]))]
        [else
         (let loop ([elts1 (Node-elts node1)])
           (cond
-           [(null? elts1) (values #f #f)]
-           [else
+           [(pair? elts1)
             (letv ([(m0 c0) (diff-node (car elts1) node2 move?)])
               (cond
                [(or (same-def? (car elts1) node2)
-                    (zero? c0))
+                    (and (zero? c0)
+                         (or (> (node-size node2) *move-size*)
+                             (same-ctx? (car elts1) node2))))
                 (let ([frame (extract-frame node1 (car elts1) del)])
                   (values (append m0 frame) c0))]
                [else
-                (loop (cdr elts1))]))]))])]
+                (loop (cdr elts1))]))]
+           [else
+            (values #f #f)]))])]
      [else (values #f #f)])))
 
 
@@ -778,6 +813,8 @@
       (printf "size of program 1: ~a~n" size1)
       (printf "size of program 2: ~a~n" size2))
     (letv ([start (current-seconds)]
+           [_ (set-node-context node1 'top)]
+           [_ (set-node-context node2 'top)]
            [(changes _) (diff-node node1 node2 #f)]
            [_ (diff-progress "\nDone diffing")]
            [changes (find-moves changes)]
@@ -805,4 +842,3 @@
       (write-html port tagged-text2 "right")
       (html-footer port)
       (close-output-port port))))
-

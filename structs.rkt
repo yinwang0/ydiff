@@ -6,7 +6,7 @@
 ;-------------------------------------------------------------
 ;                       data types
 ;-------------------------------------------------------------
-(struct Node (type start end elts [size #:mutable]) #:transparent)
+(struct Node (type start end elts [size #:mutable] [ctx #:mutable]) #:transparent)
 
 
 (define comment?
@@ -39,8 +39,8 @@
 (define decode-ast
   (lambda (exp)
     (match exp
-      [`(Node ',type ,start ,end ,elts ,size)
-       (Node start end type (decode-ast elts) size)]
+      [`(Node ',type ,start ,end ,elts ,size ,ctx)
+       (Node start end type (decode-ast elts) size ctx)]
       [`(list ,elts ...)
        (map decode-ast elts)]
       [''() '()])))
@@ -70,6 +70,10 @@
          [else (car matches)]))])))
 
 
+;; (get-tag (car (parse1 $statement "function f(x) {}"))
+;;          'name)
+
+
 ;; Find the first node containing a given path of tags.
 ;; For example: '(function parameter) could match a function's parameter
 
@@ -80,3 +84,8 @@
      [(null? tags) e]
      [else
       (match-tags (get-tag e (car tags)) (cdr tags))])))
+
+
+;; (match-tags (car (parse1 $statement "function f(x) {}"))
+;;             '(function name))
+

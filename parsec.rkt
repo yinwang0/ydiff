@@ -192,7 +192,7 @@
          [(= start (string-length s)) (values 'eof start)]
 
          [(start-with-one-of s start *significant-whitespaces*)
-          (values (Node 'newline start (add1 start) '() #f)
+          (values (Node 'newline start (add1 start) '() #f #f)
                   (add1 start))]
 
          [(whitespace? (string-ref s start))
@@ -206,7 +206,7 @@
                           start
                           (add1 line-end)
                           (substring s start line-end)
-                          #f)
+                          #f #f)
                     line-end))]
 
          [(start-with s start *comment-start*) ; block comment
@@ -218,19 +218,19 @@
                           start
                           end
                           (substring s start end)
-                          #f)
+                          #f #f)
                     end))]
 
          [(find-delim s start) =>
           (lambda (delim)
             (let ([end (+ start (string-length delim))])
-              (values (Node 'token start end delim #f)
+              (values (Node 'token start end delim #f #f)
                       end)))]
 
          [(find-operator s start) =>
           (lambda (op)
             (let ([end (+ start (string-length op))])
-              (values (Node 'token start end op #f)
+              (values (Node 'token start end op #f #f)
                       end)))]
 
          [(start-with-one-of s start *quotation-marks*)   ; string
@@ -244,7 +244,7 @@
              [else
               (let* ([len (string-length (car reg-match))]
                      [end (+ start len)])
-                (values (Node 'str start end (car reg-match) #f)
+                (values (Node 'str start end (car reg-match) #f #f)
                         end))]))]
 
          [(start-with-one-of s start *lisp-char*)         ; scheme/elisp char
@@ -259,7 +259,7 @@
                            (delim? (string-ref s end)))
                        end]
                       [else (loop (add1 end))]))])
-              (values (Node 'char start end (string-ref s (sub1 end)) #f)
+              (values (Node 'char start end (string-ref s (sub1 end)) #f #f)
                       end))])]
 
          [else                        ; identifier or number
@@ -270,7 +270,7 @@
                   (find-delim s pos)
                   (find-operator s pos))
               (let ([text (list->string (reverse chars))])
-                (values (Node 'token start pos text #f)
+                (values (Node 'token start pos text #f #f)
                         pos))]
              [else
               (loop (add1 pos) (cons (string-ref s pos) chars))]))])))
@@ -420,14 +420,14 @@
                                   (Node-start (car toks))
                                   (Node-start (car toks))
                                   '()
-                                  #f))
+                                  #f #f))
                       r)]
              [else
               (values (list (Node type
                                   (Node-start (car t))
                                   (Node-end (last t))
                                   (filter (negate phantom?) t)
-                                  #f))
+                                  #f #f))
                       r)])))))))
 
 
@@ -588,7 +588,7 @@
                                     (Node-start (car t))
                                     (Node-end (last t))
                                     '()
-                                    #f))
+                                    #f #f))
                         r)])])))))))
 
 
@@ -680,7 +680,7 @@
                           (Node-start ret)
                           (Node-end (cadr fields))
                           (list ret (car fields) (cadr fields))
-                          #f)])
+                          #f #f)])
              (loop (cddr fields) e))]))))
 
 
@@ -696,7 +696,7 @@
                             (Node-start (cadr fields))
                             (Node-end ret)
                             (list (cadr fields) (car fields) ret)
-                            #f)])
+                            #f #f)])
                (loop (cddr fields) e))])))))
 
 
@@ -782,7 +782,7 @@
                           (Node-start ret)
                           (Node-end (car ls))
                           (list ret (car ls))
-                          #f)])
+                          #f #f)])
              (loop (cdr ls) e))]))))
 
 
@@ -808,7 +808,7 @@
               (Node-start (car ls))
               (Node-end tail)
               (list (car ls) tail)
-              #f))])))
+              #f #f))])))
 
 
 ;; ($eval (@prefix 'prefix $primary-expression $prefix-operator)
