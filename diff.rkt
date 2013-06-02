@@ -40,15 +40,6 @@
 (define *inner-move-size* 2)
 
 
-;; How long must a string be in order for us to use string-dist
-;; function, which is costly when used on long strings but the most
-;; accurate method to use. Currently this parameter is set to 0,
-;; effective disables all LCS string comparison. This improves
-;; performance while not sacrificing accuracy because the algorithm is
-;; AST based.
-(define *max-string-len* 0)
-
-
 ;; Only memoize the diff of nodes of size larger than this number.
 ;; This effectively reduces memory usage.
 (define *memo-node-size* 2)
@@ -240,17 +231,10 @@
 (define diff-string
   (lambda (string1 string2 node1 node2)
     (cond
-     [(or (> (string-length string1) *max-string-len*)
-          (> (string-length string2) *max-string-len*))
-      (cond
-       [(string=? string1 string2)
-        (values (mod node1 node2 0) 0)]
-       [else
-        (total node1 node2)])]
+     [(string=? string1 string2)
+      (values (mod node1 node2 0) 0)]
      [else
-      (let ([cost (string-dist string1 string2)])
-        (values (mod node1 node2 cost) cost))])))
-
+      (total node1 node2)])))
 
 
 (define diff-list
