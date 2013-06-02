@@ -387,6 +387,7 @@
     (set! *diff-hash* (make-hasheq))
     (let loop ([workset changes]
                [finished '()])
+      (diff-progress "|")
       (letv ([dels (filter (predand del? big-change?) workset)]
              [adds (filter (predand ins? big-change?) workset)]
              [rest (set- workset (append dels adds))]

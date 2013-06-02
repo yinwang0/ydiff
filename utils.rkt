@@ -113,8 +113,16 @@
 
 (define new-progress
   (lambda (size)
-    (let ([counter 0]
-          [dots 0])
+    (let* ([counter 0]
+           [dots 0]
+           [print-mark
+            (lambda (sym)
+              (display sym)
+              (set! dots (+ dots 1))
+              (cond
+               [(= 0 (modulo dots 60))
+                (display "\n")])
+              (flush-output))])
       (lambda (x)
         (cond
          [(eq? x 'reset)
@@ -122,14 +130,11 @@
           (set! dots 0)]
          [(eq? x 'get)
           counter]
+         [(string? x)
+          (print-mark x)]
          [(= 0 (remainder counter size))
           (set! counter (+ x counter))
-          (display ".")
-          (set! dots (+ dots 1))
-          (if (= 0 (modulo dots 60))
-              (display "\n")
-              (void))
-          (flush-output)]
+          (print-mark ".")]
          [else
           (set! counter (+ x counter))])))))
 
