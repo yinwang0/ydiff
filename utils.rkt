@@ -120,6 +120,8 @@
          [(eq? x 'reset)
           (set! counter 0)
           (set! dots 0)]
+         [(eq? x 'get)
+          counter]
          [(= 0 (remainder counter size))
           (set! counter (+ x counter))
           (display ".")

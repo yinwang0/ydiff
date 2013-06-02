@@ -173,8 +173,11 @@
 
 
 
-
 ;--------------------- the primary diff function -------------------
+
+;; global 2-D hash for storing known diffs
+(define *diff-hash* (make-hasheq))
+
 (define diff-node
   (lambda (node1 node2)
 
@@ -250,11 +253,6 @@
 
 
 
-
-
-;; global 2-D hash for storing known diffs
-(define *diff-hash* (make-hasheq))
-
 (define diff-list
   (lambda (ls1 ls2)
     (let ([ls1 (sort ls1 node-sort-fn)]
@@ -324,8 +322,8 @@
     (cond
      [(and (Node? node1) (Node? node2)
            (or (same-ctx? node1 node2)
-               (and (>= (node-size node1) *move-size*)
-                    (>= (node-size node2) *move-size*))))
+               (and (big-node? node1)
+                    (big-node? node2))))
       (cond
        [(<= (node-size node1) (node-size node2))
         (let loop ([elts2 (Node-elts node2)])
@@ -335,7 +333,7 @@
               (cond
                [(or (same-def? node1 (car elts2))
                     (and (zero? c0)
-                         (or (> (node-size node1) *move-size*)
+                         (or (big-node? node1)
                              (same-ctx? node1 (car elts2)))))
                 (let ([frame (extract-frame node2 (car elts2) ins)])
                   (values (append m0 frame) c0))]
@@ -351,7 +349,7 @@
               (cond
                [(or (same-def? (car elts1) node2)
                     (and (zero? c0)
-                         (or (> (node-size node2) *move-size*)
+                         (or (big-node? node2)
                              (same-ctx? (car elts1) node2))))
                 (let ([frame (extract-frame node1 (car elts1) del)])
                   (values (append m0 frame) c0))]
@@ -360,8 +358,6 @@
            [else
             (values #f #f)]))])]
      [else (values #f #f)])))
-
-
 
 
 
@@ -432,7 +428,7 @@
 
 (define cleanup
   (lambda ()
-    (set! *diff-hash* (make-hasheq))))
+    (set! *diff-hash* #f)))
 
 
 ;; main diff function
@@ -457,5 +453,6 @@
         (letv ([changes (find-moves changes)]
                [end (current-seconds)])
           (printf "~n[finished] ~a seconds~n" (- end start))
+          (printf "~n[info] count: ~a~n" (diff-progress 'get))
           (cleanup)
           changes)))))
