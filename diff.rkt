@@ -54,6 +54,11 @@
 (define *memo-node-size* 2)
 
 
+;; Are we in moving phase?
+;; This is internal switch used by the diff algorithm.
+;; Do not modify by handl.
+(define *moving* #f)
+
 
 
 ;;------------------ frames utils --------------------
@@ -171,7 +176,7 @@
 
 ;--------------------- the primary diff function -------------------
 (define diff-node
-  (lambda (node1 node2 move?)
+  (lambda (node1 node2)
 
     (define memo
       (lambda (v1 v2)
@@ -183,11 +188,11 @@
     (define try-extract
       (lambda (changes cost)
         (cond
-         [(or (not move?)
+         [(or (not *moving*)
               (zero? cost))
           (memo changes cost)]
          [else
-          (letv ([(m c) (diff-extract node1 node2 move?)])
+          (letv ([(m c) (diff-extract node1 node2)])
             (cond
              [(not m)
               (memo changes cost)]
@@ -213,14 +218,14 @@
       (diff-string (Node-elts node1) (Node-elts node2) node1 node2)]
      [(and (Node? node1) (Node? node2)
            (eq? (get-type node1) (get-type node2)))
-      (letv ([(m c) (diff-list (Node-elts node1) (Node-elts node2) move?)])
+      (letv ([(m c) (diff-list (Node-elts node1) (Node-elts node2))])
         (try-extract m c))]
      [(and (pair? node1) (not (pair? node2)))
-      (diff-list node1 (list node2) move?)]
+      (diff-list node1 (list node2))]
      [(and (not (pair? node1)) (pair? node2))
-      (diff-list (list node1) node2 move?)]
+      (diff-list (list node1) node2)]
      [(and (pair? node1) (pair? node2))
-      (diff-list node1 node2 move?)]
+      (diff-list node1 node2)]
      [else
       (letv ([(m c) (total node1 node2)])
         (try-extract m c))])))
@@ -251,14 +256,14 @@
 (define *diff-hash* (make-hasheq))
 
 (define diff-list
-  (lambda (ls1 ls2 move?)
+  (lambda (ls1 ls2)
     (let ([ls1 (sort ls1 node-sort-fn)]
           [ls2 (sort ls2 node-sort-fn)])
-      (diff-list1 (make-hasheq) ls1 ls2 move?))))
+      (diff-list1 (make-hasheq) ls1 ls2))))
 
 
 (define diff-list1
-  (lambda (table ls1 ls2 move?)
+  (lambda (table ls1 ls2)
 
     (define memo
       (lambda (v1 v2)
@@ -267,16 +272,16 @@
 
     (define guess
       (lambda (ls1  ls2)
-        (letv ([(m0 c0) (diff-node (car ls1) (car ls2) move?)]
-               [(m1 c1) (diff-list1 table (cdr ls1) (cdr ls2) move?)]
+        (letv ([(m0 c0) (diff-node (car ls1) (car ls2))]
+               [(m1 c1) (diff-list1 table (cdr ls1) (cdr ls2))]
                [cost1 (+ c0 c1)])
           (cond
            [(or (same-def? (car ls1) (car ls2))
                 (zero? c0))
             (memo (append m0 m1) cost1)]
            [else
-            (letv ([(m2 c2) (diff-list1 table (cdr ls1) ls2  move?)]
-                   [(m3 c3) (diff-list1 table ls1 (cdr ls2) move?)]
+            (letv ([(m2 c2) (diff-list1 table (cdr ls1) ls2 )]
+                   [(m3 c3) (diff-list1 table ls1 (cdr ls2))]
                    [cost2 (+ c2 (node-size (car ls1)))]
                    [cost3 (+ c3 (node-size (car ls2)))])
               (cond
@@ -315,7 +320,7 @@
 
 ;; structure extraction
 (define diff-extract
-  (lambda (node1 node2 move?)
+  (lambda (node1 node2)
     (cond
      [(and (Node? node1) (Node? node2)
            (or (same-ctx? node1 node2)
@@ -326,7 +331,7 @@
         (let loop ([elts2 (Node-elts node2)])
           (cond
            [(pair? elts2)
-            (letv ([(m0 c0) (diff-node node1 (car elts2) move?)])
+            (letv ([(m0 c0) (diff-node node1 (car elts2))])
               (cond
                [(or (same-def? node1 (car elts2))
                     (and (zero? c0)
@@ -342,7 +347,7 @@
         (let loop ([elts1 (Node-elts node1)])
           (cond
            [(pair? elts1)
-            (letv ([(m0 c0) (diff-node (car elts1) node2 move?)])
+            (letv ([(m0 c0) (diff-node (car elts1) node2)])
               (cond
                [(or (same-def? (car elts1) node2)
                     (and (zero? c0)
@@ -406,7 +411,8 @@
              [rest (set- changes (append dels adds))]
              [ls1 (sort (map Change-old dels) node-sort-fn)]
              [ls2 (sort (map Change-new adds) node-sort-fn)]
-             [(m c) (diff-list ls1 ls2 #t)]
+             [_ (set! *moving* #t)]
+             [(m c) (diff-list ls1 ls2)]
              [new-moves (map mod->mov (filter mod? m))])
         (cond
          [(null? new-moves)
@@ -445,7 +451,7 @@
 
       (printf "[diffing]~n")
 
-      (letv ([(changes cost) (diff-node node1 node2 #f)])
+      (letv ([(changes cost) (diff-node node1 node2)])
         (diff-progress 'reset)
         (printf "~n[moving]~n")
         (letv ([changes (find-moves changes)]
