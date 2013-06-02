@@ -157,10 +157,9 @@
   (lambda (c)
     (eq? 'del (Change-type c))))
 
-(define mod?
+(define mov?
   (lambda (c)
-    (eq? 'mod (Change-type c))))
-
+    (eq? 'mov (Change-type c))))
 
 
 ;----------------- utils for creating changes ----------------
@@ -173,10 +172,6 @@
   (lambda (node)
     (let ([size (node-size node)])
       (list (Change node #f size 'del)))))
-
-(define mod
-  (lambda (node1 node2 cost)
-    (list (Change node1 node2 cost 'mod))))
 
 (define mov
   (lambda (node1 node2 cost)
@@ -191,15 +186,6 @@
           [size2 (node-size node2)])
       (values (append (del node1) (ins node2))
               (+ size1 size2)))))
-
-
-;; temporary workaround before the algorithm stablizes
-(define mod->mov
-  (lambda (c)
-    (match c
-     [(Change node1 node2 cost 'mod)
-      (Change node1 node2 cost 'mov)]
-     [other other])))
 
 
 

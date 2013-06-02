@@ -163,7 +163,6 @@
 
 
 
-
 ;--------------------- the primary diff function -------------------
 
 ;; global 2-D hash for storing known diffs
@@ -232,7 +231,7 @@
   (lambda (string1 string2 node1 node2)
     (cond
      [(string=? string1 string2)
-      (values (mod node1 node2 0) 0)]
+      (values (mov node1 node2 0) 0)]
      [else
       (total node1 node2)])))
 
@@ -361,7 +360,7 @@
       (big-node? (Change-new c))]
      [(del? c)
       (big-node? (Change-old c))]
-     [(mod? c)
+     [(mov? c)
       (or (big-node? (Change-old c))
           (big-node? (Change-new c)))])))
 
@@ -384,25 +383,25 @@
 ;; iterate diff-list on the list of changes
 (define find-moves
   (lambda (changes)
+    (set! *moving* #t)
     (set! *diff-hash* (make-hasheq))
-    (let loop ([changes changes] [closed '()] [count 1])
-      (letv ([dels (filter (predand del? big-change?) changes)]
-             [adds (filter (predand ins? big-change?) changes)]
-             [rest (set- changes (append dels adds))]
+    (let loop ([workset changes]
+               [finished '()])
+      (letv ([dels (filter (predand del? big-change?) workset)]
+             [adds (filter (predand ins? big-change?) workset)]
+             [rest (set- workset (append dels adds))]
              [ls1 (sort (map Change-old dels) node-sort-fn)]
              [ls2 (sort (map Change-new adds) node-sort-fn)]
-             [_ (set! *moving* #t)]
              [(m c) (diff-list ls1 ls2)]
-             [new-moves (map mod->mov (filter mod? m))])
+             [new-moves (filter mov? m)])
         (cond
          [(null? new-moves)
-          (let ([all-changes (append m rest closed)])
+          (let ([all-changes (append workset finished)])
             (apply append (map deframe-change all-changes)))]
          [else
-          (let ([new-changes (filter (negate mod?) m)])
+          (let ([new-changes (filter (negate mov?) m)])
             (loop new-changes
-                  (append new-moves rest closed)
-                  (add1 count)))])))))
+                  (append new-moves rest finished)))])))))
 
 
 ;; poor man's progress bar
