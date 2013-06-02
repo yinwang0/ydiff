@@ -254,12 +254,11 @@
     (define guess
       (lambda (ls1  ls2)
         (letv ([(m0 c0) (diff-node (car ls1) (car ls2))]
-               [(m1 c1) (diff-list1 table (cdr ls1) (cdr ls2))]
-               [cost1 (+ c0 c1)])
+               [(m1 c1) (diff-list1 table (cdr ls1) (cdr ls2))])
           (cond
-           [(or (same-def? (car ls1) (car ls2))
-                (zero? c0))
-            (memo (append m0 m1) cost1)]
+           [(or (zero? c0)
+                (same-def? (car ls1) (car ls2)))
+            (memo (append m0 m1) (+ c0 c1))]
            [else
             (letv ([(m2 c2) (diff-list1 table (cdr ls1) ls2 )]
                    [(m3 c3) (diff-list1 table ls1 (cdr ls2))]
