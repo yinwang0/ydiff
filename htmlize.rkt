@@ -94,7 +94,8 @@
   (lambda (change)
     (cond
      [(mov? change) "m"]                        ; move
-     [(> (Change-cost change) 0) "c"]           ; change
+     [(del? change) "d"]
+     [(ins? change) "i"]
      [else "u"])))                              ; unchanged
 
 
@@ -115,12 +116,9 @@
        ">"))))
 
 
-
 (define span-start
   (lambda (change side)
-    (let ([cls (if (eq? 'del (Change-type change)) "d" "i")]) ; del or ins
-      (string-append "<span class=" (qs cls) ">"))))
-
+    (string-append "<span class=" (qs (change-class change)) ">")))
 
 
 (define tag-sort-fn
