@@ -1,22 +1,3 @@
-// ydiff - a language-aware tool for comparing programs
-// Copyright (C) 2011-2013 Yin Wang (yinwang0@gmail.com)
-
-
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
-
 // convenience function for document.getElementById().
 window['$']=function(a){return document.getElementById(a)};
 
@@ -201,7 +182,7 @@ function clearHighlight() {
  * Highlight the link, target nodes and their lines,
  * then start animation to move the other window to match.
  */
-function highlight(me, linkId, targetId, linkLineId, targetLineId, doMatch)
+function highlight(me, linkId, targetId)
 {
     if (me.id === 'left') {
         matchId1 = linkId;
@@ -215,12 +196,6 @@ function highlight(me, linkId, targetId, linkLineId, targetLineId, doMatch)
 
     putHighlight(linkId, nodeHLColor);
     putHighlight(targetId, nodeHLColor);
-    putHighlight(linkLineId, lineHLColor);
-    putHighlight(targetLineId, lineHLColor);
-
-    if (doMatch) {
-        matchWindow(linkId, targetId, nSteps);
-    }
 }
 
 
@@ -259,7 +234,7 @@ window.onload =
                     var lid = t.id
                     var tid = t.getAttribute('tid')
                     var container = getContainer(t)
-                    highlight(container, lid, tid, 'ignore', 'ignore', false)
+                    highlight(container, lid, tid)
                 }
             tags[i].onclick =
                 function (e) {
@@ -267,7 +242,8 @@ window.onload =
                     var lid = t.id
                     var tid = t.getAttribute('tid')
                     var container = getContainer(t)
-                    highlight(container, lid, tid, 'ignore', 'ignore', true)
+                    highlight(container, lid, tid)
+                    matchWindow(lid, tid, nSteps)
                 }
         }
 
