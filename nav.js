@@ -184,16 +184,7 @@ function clearHighlight() {
  */
 function highlight(me, linkId, targetId)
 {
-    if (me.id === 'left') {
-        matchId1 = linkId;
-        matchId2 = targetId;
-    } else {
-        matchId1 = targetId;
-        matchId2 = linkId;
-    }
-
     clearHighlight();
-
     putHighlight(linkId, nodeHLColor);
     putHighlight(targetId, nodeHLColor);
 }
@@ -243,6 +234,16 @@ window.onload =
                     var tid = t.getAttribute('tid')
                     var container = getContainer(t)
                     highlight(container, lid, tid)
+
+                    // lock left and right side
+                    if (container.id === 'left') {
+                        matchId1 = lid;
+                        matchId2 = tid;
+                    } else {
+                        matchId1 = tid;
+                        matchId2 = lid;
+                    }
+
                     matchWindow(lid, tid, nSteps)
                 }
         }
