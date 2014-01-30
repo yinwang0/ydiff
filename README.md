@@ -6,7 +6,7 @@ ydiff
 
 ### Demo
 
-<a href="http://www.yinwang.org/resources/mk1-mk2.html"><img src="http://yinwang0.files.wordpress.com/2012/01/ydiff3.png?w=600"></a>
+<a href="http://www.yinwang.org/resources/mk1-mk2.html"><img src="http://yinwang0.files.wordpress.com/2012/01/ydiff3.gif?w=612"></a>
 
 ### Features
 
