@@ -1,7 +1,7 @@
 ydiff
 =======
 
-*a structural comparison tool for programs*
+*a structural comparison tool for Lisp programs*
 
 
 ### Demo
@@ -17,6 +17,18 @@ ydiff
 * _Moved code detection_. ydiff can find refactored code -- renamed, moved, reordered, wrapped, lifted, combined or fragmented code. Refactored code can be detected however deep they are into the structures.
 
 * _Human-friendly output_. The output of ydiff is designed for human understanding. The interactive UI helps the user navigate and understand changes efficiently.
+
+
+### No longer supported Languages
+
+ydiff originally aim to support multiple languages, but I found that the parsers
+are very boring and tedious to get right. I hate languages with complicated
+syntax which makes parsing hard, so I decided to stop developing parsers for
+languages except the Lisp family. The C++ parser here is just to demonstrate how
+a mostly-right C++ can be constructed within two days of work ;-) You are
+welcome to take the code and extend to complete parsing C++ and JavaScript, but
+I can't provide any assistance.
+
 
 ### Installation
 
@@ -55,13 +67,6 @@ PATH.
    present in the same directory. You must copy those files to the
    directory where you ran the commands. This is not a good user
    experience design and may be improved later.
-
-1. Please keep in mind that this is an experimental project although some
-techniques used here may have interesting innovations. Parsers are not
-the focus of this project. The C++ and JavaScript parsers in this
-project is experimental and not made for serious uses. More work is
-needed to make those parsers able to handle complete languages, but
-this is not my currently priority.
 
 
 
