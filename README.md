@@ -80,7 +80,7 @@ Yin Wang (yinwang0@gmail.com)
 
 ydiff - a structural comparison tool for Lisp programs
 
-Copyright (c) 2013-2014 Yin Wang
+Copyright (c) 2011-2014 Yin Wang
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
