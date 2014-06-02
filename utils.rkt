@@ -93,9 +93,7 @@
 
 
 
-(define char->string
-  (lambda (c)
-    (list->string (list c))))
+(define char->string string)
 
 
 (define read-file
