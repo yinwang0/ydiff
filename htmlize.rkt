@@ -148,19 +148,18 @@
 ; getting the base name of a path/file name
 ; (base-name "mk/mk-c.scm") => mk-c
 (define base-name
-  (lambda (fn)
-    (let loop ([i (- (string-length fn) 1)]
-               [start -1]
-               [end (- (string-length fn) 1)])
-      (cond
-       [(= i 0)
-        (substring fn i end)]
-       [(eq? (string-ref fn i) #\.)
-        (loop (sub1 i) start i)]
-       [(eq? (string-ref fn i) #\/)
-        (substring fn (add1 i) end)]
-       [else
-        (loop (sub1 i) start end)]))))
+  (lambda (filename)
+    (let-values ([(base name must-be-dir?) (split-path filename)])
+      (let ([filename (path->string name)])
+        (let loop ([start (sub1 (string-length filename))]
+                   [end (sub1 (string-length filename))])
+          (cond
+           [(zero? start)
+            (substring filename start end)]
+           [(char=? (string-ref filename start) #\.)
+            (loop (sub1 start) start)]
+           [else
+            (loop (sub1 start) end)]))))))
 
 
 
@@ -214,4 +213,3 @@
       (write-html port tagged-text2 "right")
       (html-footer port)
       (close-output-port port))))
-
